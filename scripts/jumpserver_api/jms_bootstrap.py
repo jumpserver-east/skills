@@ -76,11 +76,18 @@ def _required_distributions(requirements_file: Path) -> list[str]:
 
 
 def _is_distribution_installed(name: str) -> bool:
-    try:
-        metadata.version(name)
-        return True
-    except metadata.PackageNotFoundError:
-        return False
+    candidates = [name]
+    normalized = re.sub(r"[-_.]+", "-", name).lower()
+    if normalized not in candidates:
+        candidates.append(normalized)
+
+    for candidate in candidates:
+        try:
+            metadata.version(candidate)
+            return True
+        except metadata.PackageNotFoundError:
+            continue
+    return False
 
 
 def _manual_install_command(requirements_file: Path) -> list[str]:

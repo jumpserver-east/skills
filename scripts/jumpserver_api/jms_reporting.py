@@ -38,6 +38,8 @@ from .jms_analytics import (
     _login_records,
     _string_value,
     license_detail_query,
+    parse_date_value,
+    parse_datetime_value,
     resolve_command_storage_context,
     suspicious_operation_summary,
 )
@@ -148,11 +150,9 @@ def _parse_date_expr(value: str, *, reference_date: date) -> date:
         raise CLIError("Date expression is required.")
     if compact == "昨天":
         return reference_date - timedelta(days=1)
-    for fmt in ("%Y-%m-%d", "%Y/%m/%d"):
-        try:
-            return datetime.strptime(compact, fmt).date()
-        except ValueError:
-            continue
+    parsed_date = parse_date_value(compact)
+    if parsed_date is not None:
+        return parsed_date
     match = DATE_COMPACT_RE.fullmatch(compact)
     if match:
         return date(int(match.group("year")), int(match.group("month")), int(match.group("day")))
@@ -165,12 +165,11 @@ def _parse_date_expr(value: str, *, reference_date: date) -> date:
 
 def _parse_datetime_expr(value: str, *, end_of_day: bool = False) -> datetime:
     text = str(value or "").strip()
-    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y/%m/%d %H:%M:%S"):
-        try:
-            parsed = datetime.strptime(text, fmt)
-            return parsed.replace(tzinfo=SHANGHAI_TZ) if SHANGHAI_TZ else parsed.astimezone()
-        except ValueError:
-            continue
+    parsed = parse_datetime_value(text, naive_tz=SHANGHAI_TZ)
+    if parsed is not None:
+        if SHANGHAI_TZ is not None:
+            return parsed.astimezone(SHANGHAI_TZ)
+        return parsed.astimezone() if parsed.tzinfo is None else parsed.astimezone()
     parsed_date = _parse_date_expr(text, reference_date=_local_now().date())
     hour, minute, second = (23, 59, 59) if end_of_day else (0, 0, 0)
     parsed = datetime(parsed_date.year, parsed_date.month, parsed_date.day, hour, minute, second)

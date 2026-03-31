@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from collections import Counter, defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone, tzinfo
 import json
+import re
 from typing import Any
 
 from .jms_capabilities import CAPABILITY_BY_ID
@@ -30,10 +31,86 @@ ROLE_BINDINGS_PATH = "/api/v1/rbac/role-bindings/"
 ORG_ROLE_BINDINGS_PATH = "/api/v1/rbac/org-role-bindings/"
 SYSTEM_ROLE_BINDINGS_PATH = "/api/v1/rbac/system-role-bindings/"
 ROLES_PATH = "/api/v1/rbac/roles/"
+CANONICAL_DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+DATE_INPUT_FORMATS = (
+    "%Y-%m-%d",
+    "%Y/%m/%d",
+)
+DATETIME_INPUT_FORMATS = (
+    "%Y-%m-%d %H:%M:%S",
+    "%Y/%m/%d %H:%M:%S",
+    "%Y-%m-%dT%H:%M:%S.%f%z",
+    "%Y-%m-%dT%H:%M:%S%z",
+    "%Y-%m-%dT%H:%M:%S.%fZ",
+    "%Y-%m-%dT%H:%M:%SZ",
+    "%Y-%m-%d %H:%M:%S%z",
+    "%Y/%m/%d %H:%M:%S %z",
+)
+BASIC_NAIVE_DATETIME_RE = re.compile(r"^\d{4}[-/]\d{2}[-/]\d{2}\s+\d{2}:\d{2}:\d{2}$")
 
 
 def _lower(value: Any) -> str:
     return str(value or "").strip().lower()
+
+
+def parse_date_value(value: Any) -> date | None:
+    if value in {None, ""}:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+
+    text = str(value).strip()
+    if not text:
+        return None
+
+    for fmt in DATE_INPUT_FORMATS:
+        try:
+            return datetime.strptime(text, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def parse_datetime_value(value: Any, *, naive_tz: tzinfo | None = timezone.utc) -> datetime | None:
+    if value in {None, ""}:
+        return None
+    if isinstance(value, datetime):
+        if value.tzinfo is None and naive_tz is not None:
+            return value.replace(tzinfo=naive_tz)
+        return value
+    if isinstance(value, date):
+        parsed = datetime.combine(value, time())
+        if naive_tz is not None:
+            parsed = parsed.replace(tzinfo=naive_tz)
+        return parsed
+    if isinstance(value, (int, float)):
+        return datetime.fromtimestamp(float(value), tz=timezone.utc)
+
+    text = str(value).strip()
+    if not text:
+        return None
+
+    for fmt in DATETIME_INPUT_FORMATS:
+        try:
+            parsed = datetime.strptime(text, fmt)
+        except ValueError:
+            continue
+        if parsed.tzinfo is None and naive_tz is not None:
+            parsed = parsed.replace(tzinfo=naive_tz)
+        return parsed
+    return None
+
+
+def normalize_basic_datetime_text(value: Any, *, naive_tz: tzinfo | None = timezone.utc) -> str | None:
+    text = str(value or "").strip()
+    if not BASIC_NAIVE_DATETIME_RE.fullmatch(text):
+        return None
+    parsed = parse_datetime_value(text, naive_tz=naive_tz)
+    if parsed is None:
+        return None
+    return parsed.strftime(CANONICAL_DATETIME_FORMAT)
 
 
 def _is_empty_like(value: Any) -> bool:
@@ -278,35 +355,11 @@ def _extract_datetime(item: dict[str, Any]) -> datetime | None:
         "datetime",
         "timestamp",
     )
-    if value in {None, ""}:
-        return None
-    if isinstance(value, (int, float)):
-        return datetime.fromtimestamp(float(value), tz=timezone.utc)
-    text = str(value).strip()
-    for fmt in (
-        "%Y-%m-%d %H:%M:%S",
-        "%Y-%m-%dT%H:%M:%S.%f%z",
-        "%Y-%m-%dT%H:%M:%S%z",
-        "%Y-%m-%dT%H:%M:%S.%fZ",
-        "%Y-%m-%dT%H:%M:%SZ",
-        "%Y-%m-%d %H:%M:%S%z",
-        "%Y/%m/%d %H:%M:%S %z",
-        "%Y/%m/%d %H:%M:%S",
-    ):
-        try:
-            parsed = datetime.strptime(text, fmt)
-            if parsed.tzinfo is None:
-                parsed = parsed.replace(tzinfo=timezone.utc)
-            return parsed
-        except ValueError:
-            continue
-    return None
+    return parse_datetime_value(value, naive_tz=timezone.utc)
 
 
 def _parse_datetime_value(value: Any) -> datetime | None:
-    if value in {None, ""}:
-        return None
-    return _extract_datetime({"date_from": value})
+    return parse_datetime_value(value, naive_tz=timezone.utc)
 
 
 def _extract_duration(item: dict[str, Any]) -> float | None:
@@ -363,11 +416,11 @@ def _normalize_time_filters(filters: dict[str, Any], *, default_days: int = 7) -
         date_from = (now - timedelta(days=default_days)).strftime("%Y-%m-%d %H:%M:%S")
         date_to = now.strftime("%Y-%m-%d %H:%M:%S")
     if date_from not in {None, ""}:
-        payload["date_from"] = date_from
+        payload["date_from"] = normalize_basic_datetime_text(date_from, naive_tz=timezone.utc) or date_from
     if date_to not in {None, ""}:
-        payload["date_to"] = date_to
-    payload["_date_from"] = _parse_datetime_value(date_from)
-    payload["_date_to"] = _parse_datetime_value(date_to) or now
+        payload["date_to"] = normalize_basic_datetime_text(date_to, naive_tz=timezone.utc) or date_to
+    payload["_date_from"] = _parse_datetime_value(payload.get("date_from"))
+    payload["_date_to"] = _parse_datetime_value(payload.get("date_to")) or now
     return payload
 
 
