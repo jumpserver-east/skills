@@ -29,6 +29,7 @@ from jumpserver_api.jms_analytics import (
     _fetch_session_records,
     _login_records,
     _normalize_time_filters,
+    _operate_audit_server_filters,
     _resolve_asset,
     _resolve_user,
     _server_filters,
@@ -41,8 +42,11 @@ from jumpserver_api.jms_capabilities import CAPABILITIES
 from jumpserver_api.jms_runtime import (
     build_org_selection_required_payload,
     CLIError,
+    CLIHelpFormatter,
     DEFAULT_PAGE_SIZE,
     ORG_SELECTION_NEXT_STEP,
+    add_filter_arguments,
+    build_cli_guidance_payload,
     create_client,
     create_discovery,
     current_runtime_values,
@@ -50,6 +54,7 @@ from jumpserver_api.jms_runtime import (
     get_config_status,
     list_accessible_orgs,
     org_context_output,
+    merge_filter_args,
     parse_json_arg,
     persist_selected_org,
     require_confirmation,
@@ -61,13 +66,41 @@ from jumpserver_api.jms_runtime import (
 )
 
 
+SELECT_ORG_REASON_CODE = "organization_not_accessible"
+AMBIGUOUS_ORG_REASON_CODE = "ambiguous_organization"
+MISSING_ENDPOINT_PATH_REASON_CODE = "missing_endpoint_path"
+UNSUPPORTED_VERIFICATION_METHOD_REASON_CODE = "unsupported_verification_method"
+
+SELECT_ORG_EXAMPLES = [
+    "python3 scripts/jumpserver_api/jms_diagnose.py select-org",
+    "python3 scripts/jumpserver_api/jms_diagnose.py select-org --org-name Default",
+]
+RECENT_AUDIT_EXAMPLES = [
+    "python3 scripts/jumpserver_api/jms_diagnose.py recent-audit --audit-type login --days 7 --limit 5",
+    "python3 scripts/jumpserver_api/jms_diagnose.py recent-audit --audit-type session --user gusiqing --date-from '2026-03-23 00:00:00' --date-to '2026-03-23 23:59:59' --limit 10",
+]
+REPORTS_EXAMPLES = [
+    "python3 scripts/jumpserver_api/jms_diagnose.py reports --report-type account-statistic --days 30",
+]
+INSPECT_EXAMPLES = [
+    "python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability hot-assets-ranking --days 30 --top 10 --limit 10",
+    "python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability system-settings-overview",
+]
+
+
 def _config_status(_: argparse.Namespace):
     return get_config_status()
 
 
 def _config_write(args: argparse.Namespace):
     require_confirmation(args)
-    payload = parse_json_arg(args.payload)
+    payload = parse_json_arg(
+        args.payload,
+        source="--payload",
+        usage_examples=[
+            "python3 scripts/jumpserver_api/jms_diagnose.py config-write --payload '{\"JMS_API_URL\": \"https://jump.example.com\"}' --confirm",
+        ],
+    )
     return write_local_env_config(payload)
 
 
@@ -89,10 +122,57 @@ def _ping(_: argparse.Namespace):
     }
 
 
+def _add_pagination_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--limit", type=int, help="返回条数上限。")
+    parser.add_argument("--offset", type=int, help="分页偏移量。")
+
+
+def _add_time_filter_arguments(parser: argparse.ArgumentParser, *, include_days: bool = True) -> None:
+    parser.add_argument("--date-from", dest="date_from", help="开始时间，格式如 `2026-03-23 00:00:00`。")
+    parser.add_argument("--date-to", dest="date_to", help="结束时间，格式如 `2026-03-23 23:59:59`。")
+    if include_days:
+        parser.add_argument("--days", type=int, help="最近 N 天；未显式给时间窗时使用。")
+
+
+def _add_common_audit_filter_arguments(parser: argparse.ArgumentParser) -> None:
+    _add_time_filter_arguments(parser)
+    parser.add_argument("--user", help="用户名或显示名。")
+    parser.add_argument("--user-id", dest="user_id", help="用户 UUID。")
+    parser.add_argument("--asset", help="资产名称、地址或关键字。")
+    parser.add_argument("--status", help="状态过滤，例如 `success`、`failed`。")
+    parser.add_argument("--protocol", help="协议过滤，例如 `ssh`。")
+    parser.add_argument("--account", help="账号过滤。")
+    parser.add_argument("--source-ip", dest="source_ip", help="来源 IP 过滤。")
+    parser.add_argument("--keyword", help="关键字过滤。")
+    _add_pagination_arguments(parser)
+
+
+def _add_lookup_filter_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--name", help="按名称精确优先匹配。")
+    parser.add_argument("--search", help="服务端搜索关键字。")
+    _add_pagination_arguments(parser)
+
+
 def _select_org(args: argparse.Namespace):
     candidates = list_accessible_orgs()
     current_context = resolve_effective_org_context(auto_select=False)
-    if not args.org_id:
+    provided_selectors = [
+        name
+        for name, value in {"org_id": getattr(args, "org_id", None), "org_name": getattr(args, "org_name", None)}.items()
+        if str(value or "").strip()
+    ]
+    if len(provided_selectors) > 1:
+        raise CLIError(
+            "组织选择参数冲突。",
+            payload=build_cli_guidance_payload(
+                AMBIGUOUS_ORG_REASON_CODE,
+                user_message="`select-org` 只能传 `--org-id` 或 `--org-name` 其中一个。",
+                action_hint="请保留一个组织定位参数后重试。",
+                suggested_commands=SELECT_ORG_EXAMPLES,
+                provided=provided_selectors,
+            ),
+        )
+    if not args.org_id and not getattr(args, "org_name", None):
         if current_context.get("selection_required"):
             return build_org_selection_required_payload(current_context)
         return {
@@ -101,9 +181,39 @@ def _select_org(args: argparse.Namespace):
             "next_step": ORG_SELECTION_NEXT_STEP,
             **org_context_output(current_context),
         }
-    selected = next((item for item in candidates if str(item.get("id")) == args.org_id), None)
-    if selected is None:
-        raise CLIError("Organization %s is not accessible in the current environment." % args.org_id)
+    target_org_id = str(getattr(args, "org_id", None) or "").strip()
+    target_org_name = str(getattr(args, "org_name", None) or "").strip()
+    if target_org_id:
+        matches = [item for item in candidates if str(item.get("id") or "").strip() == target_org_id]
+    else:
+        matches = _exact_first_filter([item for item in candidates if isinstance(item, dict)], target_org_name, "name")
+    if not matches:
+        raise CLIError(
+            "指定的组织当前不可访问。",
+            payload=build_cli_guidance_payload(
+                SELECT_ORG_REASON_CODE,
+                user_message="当前账号下找不到你指定的组织，请先从 `candidate_orgs` 里确认可访问组织。",
+                action_hint="可以先执行不带参数的 `select-org` 查看候选组织，再改用 `--org-id` 或精确的 `--org-name`。",
+                suggested_commands=SELECT_ORG_EXAMPLES,
+                org_id=target_org_id or None,
+                org_name=target_org_name or None,
+                candidate_orgs=candidates,
+            ),
+        )
+    if len(matches) > 1:
+        raise CLIError(
+            "给定的组织名称匹配到多个候选组织。",
+            payload=build_cli_guidance_payload(
+                AMBIGUOUS_ORG_REASON_CODE,
+                user_message="当前 `--org-name` 命中了多个组织，请改用更精确的名称或直接使用 `--org-id`。",
+                action_hint="优先从返回的 `candidate_orgs` 中复制准确的 org_id 再执行。",
+                suggested_commands=SELECT_ORG_EXAMPLES,
+                org_name=target_org_name or None,
+                candidate_orgs=matches[:10],
+            ),
+        )
+    selected = matches[0]
+    selected_org_id = str(selected.get("id") or "").strip()
     preview_scope = "%s (%s)" % (
         str(selected.get("name") or "").strip() or "Unknown",
         str(selected.get("id") or "").strip() or "<unknown-org-id>",
@@ -111,8 +221,8 @@ def _select_org(args: argparse.Namespace):
     preview_context = {
         **current_context,
         "effective_org": {**selected, "source": "user_selected"},
-        "switchable_orgs": [item for item in candidates if str(item.get("id") or "") != str(args.org_id)],
-        "switchable_org_count": len([item for item in candidates if str(item.get("id") or "") != str(args.org_id)]),
+        "switchable_orgs": [item for item in candidates if str(item.get("id") or "") != selected_org_id],
+        "switchable_org_count": len([item for item in candidates if str(item.get("id") or "") != selected_org_id]),
         "org_context_hint": (
             "当前预览的查询范围将切换为组织 %s；确认写入后才能按该组织继续查询。"
             % preview_scope
@@ -121,11 +231,11 @@ def _select_org(args: argparse.Namespace):
     if not args.confirm:
         return {
             "selection_required": False,
-            "next_step": "python3 scripts/jumpserver_api/jms_diagnose.py select-org --org-id %s --confirm" % args.org_id,
+            "next_step": "python3 scripts/jumpserver_api/jms_diagnose.py select-org --org-id %s --confirm" % selected_org_id,
             **org_context_output(preview_context),
         }
     require_confirmation(args)
-    persisted = persist_selected_org(args.org_id)
+    persisted = persist_selected_org(selected_org_id)
     confirmed_context = {
         **preview_context,
         "org_context_hint": (
@@ -147,7 +257,14 @@ def _resolve(args: argparse.Namespace):
     ensure_selected_org_context()
     client = create_client()
     discovery = create_discovery()
-    filters = parse_json_arg(args.filters)
+    filters = merge_filter_args(
+        args,
+        explicit_fields=("name", "search", "limit", "offset"),
+        usage_examples=[
+            "python3 scripts/jumpserver_api/jms_diagnose.py resolve --resource organization --name Default",
+            "python3 scripts/jumpserver_api/jms_diagnose.py resolve --resource user --name gusiqing --limit 5",
+        ],
+    )
     if args.resource == "asset":
         items = discovery.list_assets()
         field_names = ("id", "name", "address")
@@ -507,7 +624,28 @@ def _format_recent_audit_record(audit_type: str, item: dict, *, filters: dict | 
 
 def _recent_audit(args: argparse.Namespace):
     context = ensure_selected_org_context()
-    filters = _normalize_time_filters(parse_json_arg(args.filters), default_days=7)
+    filters = _normalize_time_filters(
+        merge_filter_args(
+            args,
+            explicit_fields=(
+                "date_from",
+                "date_to",
+                "days",
+                "user",
+                "user_id",
+                "asset",
+                "status",
+                "protocol",
+                "account",
+                "source_ip",
+                "keyword",
+                "limit",
+                "offset",
+            ),
+            usage_examples=RECENT_AUDIT_EXAMPLES,
+        ),
+        default_days=7,
+    )
     handlers = {
         "login": _login_records,
         "session": _fetch_session_records,
@@ -515,7 +653,7 @@ def _recent_audit(args: argparse.Namespace):
     }
     if args.audit_type == "operate":
         client = create_client()
-        server_filters = _server_filters(filters)
+        server_filters = _operate_audit_server_filters(filters)
         result = client.list_paginated("/api/v1/audits/operate-logs/", params=server_filters)
         records = _apply_common_filters([item for item in result if isinstance(item, dict)], filters)
     else:
@@ -543,8 +681,14 @@ def _recent_audit(args: argparse.Namespace):
 
 def _settings_category(args: argparse.Namespace):
     ensure_selected_org_context()
-    filters = parse_json_arg(args.filters, default={"category": args.category})
-    filters.setdefault("category", args.category)
+    filters = merge_filter_args(
+        args,
+        default={"category": args.category},
+        explicit_fields=("category",),
+        usage_examples=[
+            "python3 scripts/jumpserver_api/jms_diagnose.py settings-category --category security_auth",
+        ],
+    )
     return run_capability("setting-category-query", filters)
 
 
@@ -555,40 +699,72 @@ def _license_detail(_: argparse.Namespace):
 
 def _tickets(args: argparse.Namespace):
     ensure_selected_org_context()
-    filters = parse_json_arg(args.filters)
+    filters = merge_filter_args(
+        args,
+        explicit_fields=("name", "search", "limit", "offset"),
+        usage_examples=[
+            "python3 scripts/jumpserver_api/jms_diagnose.py tickets --limit 10",
+        ],
+    )
     return run_capability("ticket-list-query", filters)
 
 
 def _command_storages(args: argparse.Namespace):
     ensure_selected_org_context()
-    filters = parse_json_arg(args.filters)
+    filters = merge_filter_args(
+        args,
+        explicit_fields=("name", "search", "limit", "offset"),
+        usage_examples=[
+            "python3 scripts/jumpserver_api/jms_diagnose.py command-storages --limit 10",
+        ],
+    )
     return run_capability("command-storage-query", filters)
 
 
 def _replay_storages(args: argparse.Namespace):
     ensure_selected_org_context()
-    filters = parse_json_arg(args.filters)
+    filters = merge_filter_args(
+        args,
+        explicit_fields=("name", "search", "limit", "offset"),
+        usage_examples=[
+            "python3 scripts/jumpserver_api/jms_diagnose.py replay-storages --limit 10",
+        ],
+    )
     return run_capability("replay-storage-query", filters)
 
 
 def _terminals(args: argparse.Namespace):
     ensure_selected_org_context()
-    filters = parse_json_arg(args.filters)
+    filters = merge_filter_args(
+        args,
+        explicit_fields=("name", "search", "limit", "offset"),
+        usage_examples=[
+            "python3 scripts/jumpserver_api/jms_diagnose.py terminals --limit 10",
+        ],
+    )
     return run_capability("terminal-component-query", filters)
 
 
 def _reports(args: argparse.Namespace):
     ensure_selected_org_context()
-    filters = parse_json_arg(args.filters, default={"report_type": args.report_type})
-    filters.setdefault("report_type", args.report_type)
-    if args.days is not None and filters.get("days") in {None, ""}:
-        filters["days"] = args.days
+    filters = merge_filter_args(
+        args,
+        default={"report_type": args.report_type},
+        explicit_fields=("report_type", "days", "date_from", "date_to", "limit", "offset", "top"),
+        usage_examples=REPORTS_EXAMPLES,
+    )
     return run_capability("report-query", filters)
 
 
 def _account_automations(args: argparse.Namespace):
     ensure_selected_org_context()
-    filters = parse_json_arg(args.filters)
+    filters = merge_filter_args(
+        args,
+        explicit_fields=("days", "date_from", "date_to", "limit", "offset", "top", "search"),
+        usage_examples=[
+            "python3 scripts/jumpserver_api/jms_diagnose.py account-automations --days 30 --limit 10",
+        ],
+    )
     return run_capability("account-automation-overview", filters)
 
 
@@ -601,10 +777,25 @@ def _endpoint_inventory(args: argparse.Namespace):
 def _endpoint_verify(args: argparse.Namespace):
     ensure_selected_org_context()
     client = create_client()
-    filters = parse_json_arg(args.filters)
+    filters = merge_filter_args(
+        args,
+        usage_examples=[
+            "python3 scripts/jumpserver_api/jms_diagnose.py endpoint-verify --path /api/v1/settings/setting/ --method GET",
+        ],
+    )
     path = str(args.path or filters.get("path") or "").strip()
     if not path:
-        raise CLIError("Provide --path or filters.path.")
+        raise CLIError(
+            "缺少待验证的端点路径。",
+            payload=build_cli_guidance_payload(
+                MISSING_ENDPOINT_PATH_REASON_CODE,
+                user_message="请通过 `--path` 指定要验证的 API 路径。",
+                action_hint="例如 `--path /api/v1/settings/setting/`；只有兼容旧命令时才建议放进 `--filters`。",
+                suggested_commands=[
+                    "python3 scripts/jumpserver_api/jms_diagnose.py endpoint-verify --path /api/v1/settings/setting/ --method GET",
+                ],
+            ),
+        )
     method = str(args.method or filters.get("method") or "GET").strip().upper()
     params = filters.get("params") if isinstance(filters.get("params"), dict) else None
     if method == "OPTIONS":
@@ -612,12 +803,43 @@ def _endpoint_verify(args: argparse.Namespace):
     elif method == "GET":
         payload = client.get(path, params=params)
     else:
-        raise CLIError("Unsupported verification method: %s" % method)
+        raise CLIError(
+            "不支持的验证方法：%s" % method,
+            payload=build_cli_guidance_payload(
+                UNSUPPORTED_VERIFICATION_METHOD_REASON_CODE,
+                user_message="`endpoint-verify` 目前只支持 `GET` 和 `OPTIONS`。",
+                action_hint="请把 `--method` 改成 `GET` 或 `OPTIONS`。",
+                suggested_commands=[
+                    "python3 scripts/jumpserver_api/jms_diagnose.py endpoint-verify --path /api/v1/settings/setting/ --method GET",
+                ],
+                method=method,
+            ),
+        )
     return {"method": method, "path": path, "payload": payload}
 
 
 def _inspect(args: argparse.Namespace):
-    filters = parse_json_arg(args.filters)
+    filters = merge_filter_args(
+        args,
+        explicit_fields=(
+            "days",
+            "date_from",
+            "date_to",
+            "limit",
+            "offset",
+            "top",
+            "search",
+            "user",
+            "user_id",
+            "asset",
+            "asset_keywords",
+            "status",
+            "direction",
+            "keyword",
+            "protocol",
+        ),
+        usage_examples=INSPECT_EXAMPLES,
+    )
     return run_capability(args.capability, filters)
 
 
@@ -641,50 +863,108 @@ def _add_optional_org_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="JumpServer diagnostics, inventory and settings inspection.")
+    parser = argparse.ArgumentParser(
+        description="JumpServer 诊断、访问分析与系统巡检入口。",
+        epilog=(
+            "推荐路径:\n"
+            "  1. 预检先用 config-status 与 ping\n"
+            "  2. 组织切换优先用 select-org --org-name/--org-id\n"
+            "  3. 高级补充筛选优先用重复的 --filter key=value"
+        ),
+        formatter_class=CLIHelpFormatter,
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    config_status_parser = subparsers.add_parser("config-status")
+    config_status_parser = subparsers.add_parser(
+        "config-status",
+        help="查看本地运行时配置状态。",
+        description="检查 .env 是否完整，以及当前鉴权模式和非敏感配置。",
+        formatter_class=CLIHelpFormatter,
+    )
     config_status_parser.add_argument("--json", action="store_true")
     config_status_parser.set_defaults(func=_config_status)
 
-    config_write_parser = subparsers.add_parser("config-write")
+    config_write_parser = subparsers.add_parser(
+        "config-write",
+        help="写入本地 .env 配置。",
+        description="把准备好的运行时配置写回本地 .env；执行前必须加 --confirm。",
+        formatter_class=CLIHelpFormatter,
+    )
     config_write_parser.add_argument("--payload", required=True)
     config_write_parser.add_argument("--confirm", action="store_true")
     config_write_parser.set_defaults(func=_config_write)
 
-    ping_parser = subparsers.add_parser("ping")
+    ping_parser = subparsers.add_parser(
+        "ping",
+        help="检查连通性、当前用户和组织上下文。",
+        description="验证 JumpServer 可连接，并回显当前用户、当前组织和可切换组织。",
+        formatter_class=CLIHelpFormatter,
+    )
     ping_parser.set_defaults(func=_ping)
 
-    select_org_parser = subparsers.add_parser("select-org")
+    select_org_parser = subparsers.add_parser(
+        "select-org",
+        help="预览或切换当前组织。",
+        description="不带参数时查看当前组织上下文；带 `--org-id` 或 `--org-name` 时预览切换结果，追加 `--confirm` 才会写回本地配置。",
+        epilog="Examples:\n  " + "\n  ".join(SELECT_ORG_EXAMPLES),
+        formatter_class=CLIHelpFormatter,
+    )
     select_org_parser.add_argument("--org-id")
+    select_org_parser.add_argument("--org-name")
     select_org_parser.add_argument("--confirm", action="store_true")
     select_org_parser.set_defaults(func=_select_org)
 
-    resolve_parser = subparsers.add_parser("resolve")
+    resolve_parser = subparsers.add_parser(
+        "resolve",
+        help="把自然语言对象名解析成精确对象。",
+        description="用于资产、节点、用户、组织、平台等对象的精确解析。",
+        formatter_class=CLIHelpFormatter,
+    )
     resolve_parser.add_argument("--resource", required=True, choices=["asset", "node", "user", "user-group", "organization", "account", "platform", "permission"])
     resolve_parser.add_argument("--id")
     resolve_parser.add_argument("--name")
-    resolve_parser.add_argument("--filters")
+    resolve_parser.add_argument("--search", help="服务端搜索关键字。")
+    _add_pagination_arguments(resolve_parser)
+    add_filter_arguments(resolve_parser)
     resolve_parser.set_defaults(func=_resolve)
 
-    resolve_platform_parser = subparsers.add_parser("resolve-platform")
+    resolve_platform_parser = subparsers.add_parser(
+        "resolve-platform",
+        help="解析平台名称或分类。",
+        description="把平台名、slug 或 category 解析成平台对象。",
+        formatter_class=CLIHelpFormatter,
+    )
     resolve_platform_parser.add_argument("--value", required=True)
     resolve_platform_parser.set_defaults(func=_resolve_platform)
 
-    user_assets_parser = subparsers.add_parser("user-assets")
+    user_assets_parser = subparsers.add_parser(
+        "user-assets",
+        help="查询用户当前可访问资产。",
+        description="读取 JumpServer effective access 接口，返回用户在指定组织下当前可访问的资产。",
+        formatter_class=CLIHelpFormatter,
+    )
     user_assets_parser.add_argument("--user-id")
     user_assets_parser.add_argument("--username", "--user-name", dest="username")
     _add_optional_org_arguments(user_assets_parser)
     user_assets_parser.set_defaults(func=_user_assets)
 
-    user_nodes_parser = subparsers.add_parser("user-nodes")
+    user_nodes_parser = subparsers.add_parser(
+        "user-nodes",
+        help="查询用户当前可访问节点。",
+        description="读取 JumpServer effective access 接口，返回用户在指定组织下当前可访问的节点。",
+        formatter_class=CLIHelpFormatter,
+    )
     user_nodes_parser.add_argument("--user-id")
     user_nodes_parser.add_argument("--username", "--user-name", dest="username")
     _add_optional_org_arguments(user_nodes_parser)
     user_nodes_parser.set_defaults(func=_user_nodes)
 
-    user_asset_access_parser = subparsers.add_parser("user-asset-access")
+    user_asset_access_parser = subparsers.add_parser(
+        "user-asset-access",
+        help="查询用户在某资产下可用的账号和协议。",
+        description="从用户和资产两个维度读取有效访问范围，返回账号和协议集合。",
+        formatter_class=CLIHelpFormatter,
+    )
     user_asset_access_parser.add_argument("--user-id")
     user_asset_access_parser.add_argument("--username", "--user-name", dest="username")
     user_asset_access_parser.add_argument("--asset-id")
@@ -692,42 +972,94 @@ def build_parser() -> argparse.ArgumentParser:
     _add_optional_org_arguments(user_asset_access_parser)
     user_asset_access_parser.set_defaults(func=_user_asset_access)
 
-    asset_permission_explain_parser = subparsers.add_parser("asset-permission-explain")
+    asset_permission_explain_parser = subparsers.add_parser(
+        "asset-permission-explain",
+        help="解释某资产命中的权限规则。",
+        description="从资产视角解释直接资产、标签和节点继承命中的授权规则。",
+        formatter_class=CLIHelpFormatter,
+    )
     asset_permission_explain_parser.add_argument("--asset-id")
     asset_permission_explain_parser.add_argument("--asset-name")
     _add_optional_org_arguments(asset_permission_explain_parser)
     asset_permission_explain_parser.set_defaults(func=_asset_permission_explain)
 
-    recent_audit_parser = subparsers.add_parser("recent-audit")
+    recent_audit_parser = subparsers.add_parser(
+        "recent-audit",
+        help="快速查看最近审计。",
+        description="快速读取最近登录、会话、命令或操作审计；未给时间时默认最近 7 天。",
+        epilog="Examples:\n  " + "\n  ".join(RECENT_AUDIT_EXAMPLES),
+        formatter_class=CLIHelpFormatter,
+    )
     recent_audit_parser.add_argument("--audit-type", required=True, choices=["operate", "login", "session", "command"])
-    recent_audit_parser.add_argument("--filters")
+    _add_common_audit_filter_arguments(recent_audit_parser)
+    add_filter_arguments(recent_audit_parser)
     recent_audit_parser.set_defaults(func=_recent_audit)
 
-    settings_category_parser = subparsers.add_parser("settings-category")
+    settings_category_parser = subparsers.add_parser(
+        "settings-category",
+        help="按分类读取系统设置。",
+        description="根据 settings category 读取系统设置原始结果。",
+        formatter_class=CLIHelpFormatter,
+    )
     settings_category_parser.add_argument("--category", required=True)
-    settings_category_parser.add_argument("--filters")
+    add_filter_arguments(settings_category_parser)
     settings_category_parser.set_defaults(func=_settings_category)
 
-    license_parser = subparsers.add_parser("license-detail")
+    license_parser = subparsers.add_parser(
+        "license-detail",
+        help="查看许可证详情。",
+        description="读取当前环境下的许可证详情。",
+        formatter_class=CLIHelpFormatter,
+    )
     license_parser.set_defaults(func=_license_detail)
 
-    tickets_parser = subparsers.add_parser("tickets")
-    tickets_parser.add_argument("--filters")
+    tickets_parser = subparsers.add_parser(
+        "tickets",
+        help="查看工单列表。",
+        description="查询工单记录，支持名称搜索和分页。",
+        formatter_class=CLIHelpFormatter,
+    )
+    _add_lookup_filter_arguments(tickets_parser)
+    add_filter_arguments(tickets_parser)
     tickets_parser.set_defaults(func=_tickets)
 
-    command_storages_parser = subparsers.add_parser("command-storages")
-    command_storages_parser.add_argument("--filters")
+    command_storages_parser = subparsers.add_parser(
+        "command-storages",
+        help="查看命令存储列表。",
+        description="查询 command storage 列表，支持名称搜索和分页。",
+        formatter_class=CLIHelpFormatter,
+    )
+    _add_lookup_filter_arguments(command_storages_parser)
+    add_filter_arguments(command_storages_parser)
     command_storages_parser.set_defaults(func=_command_storages)
 
-    replay_storages_parser = subparsers.add_parser("replay-storages")
-    replay_storages_parser.add_argument("--filters")
+    replay_storages_parser = subparsers.add_parser(
+        "replay-storages",
+        help="查看录像存储列表。",
+        description="查询 replay storage 列表，支持名称搜索和分页。",
+        formatter_class=CLIHelpFormatter,
+    )
+    _add_lookup_filter_arguments(replay_storages_parser)
+    add_filter_arguments(replay_storages_parser)
     replay_storages_parser.set_defaults(func=_replay_storages)
 
-    terminals_parser = subparsers.add_parser("terminals")
-    terminals_parser.add_argument("--filters")
+    terminals_parser = subparsers.add_parser(
+        "terminals",
+        help="查看终端组件列表。",
+        description="查询终端组件列表，支持名称搜索和分页。",
+        formatter_class=CLIHelpFormatter,
+    )
+    _add_lookup_filter_arguments(terminals_parser)
+    add_filter_arguments(terminals_parser)
     terminals_parser.set_defaults(func=_terminals)
 
-    reports_parser = subparsers.add_parser("reports")
+    reports_parser = subparsers.add_parser(
+        "reports",
+        help="读取系统报表与 dashboard。",
+        description="读取 account / asset 等系统报表，支持时间范围和分页参数。",
+        epilog="Examples:\n  " + "\n  ".join(REPORTS_EXAMPLES),
+        formatter_class=CLIHelpFormatter,
+    )
     reports_parser.add_argument(
         "--report-type",
         required=True,
@@ -742,30 +1074,74 @@ def build_parser() -> argparse.ArgumentParser:
             "change-secret-dashboard",
         ],
     )
-    reports_parser.add_argument("--days", type=int)
-    reports_parser.add_argument("--filters")
+    _add_time_filter_arguments(reports_parser)
+    _add_pagination_arguments(reports_parser)
+    reports_parser.add_argument("--top", type=int, help="排行类报表返回前 N 条。")
+    add_filter_arguments(reports_parser)
     reports_parser.set_defaults(func=_reports)
 
-    account_automations_parser = subparsers.add_parser("account-automations")
-    account_automations_parser.add_argument("--filters")
+    account_automations_parser = subparsers.add_parser(
+        "account-automations",
+        help="查看账号自动化与风险概览。",
+        description="查询账号自动化、风险、备份和改密等聚合结果。",
+        formatter_class=CLIHelpFormatter,
+    )
+    _add_time_filter_arguments(account_automations_parser)
+    account_automations_parser.add_argument("--search", help="搜索关键字。")
+    _add_pagination_arguments(account_automations_parser)
+    account_automations_parser.add_argument("--top", type=int, help="排行类场景返回前 N 条。")
+    add_filter_arguments(account_automations_parser)
     account_automations_parser.set_defaults(func=_account_automations)
 
-    endpoint_inventory_parser = subparsers.add_parser("endpoint-inventory")
+    endpoint_inventory_parser = subparsers.add_parser(
+        "endpoint-inventory",
+        help="查看端点 inventory。",
+        description="输出当前环境探测到的核心端点 inventory 与缓存。",
+        formatter_class=CLIHelpFormatter,
+    )
     endpoint_inventory_parser.add_argument("--refresh", action="store_true")
     endpoint_inventory_parser.set_defaults(func=_endpoint_inventory)
 
-    endpoint_verify_parser = subparsers.add_parser("endpoint-verify")
+    endpoint_verify_parser = subparsers.add_parser(
+        "endpoint-verify",
+        help="验证单个端点的 GET/OPTIONS 能力。",
+        description="对指定 API 路径做只读验证。",
+        formatter_class=CLIHelpFormatter,
+    )
     endpoint_verify_parser.add_argument("--path")
     endpoint_verify_parser.add_argument("--method", choices=["GET", "OPTIONS"], default="GET")
-    endpoint_verify_parser.add_argument("--filters")
+    add_filter_arguments(endpoint_verify_parser)
     endpoint_verify_parser.set_defaults(func=_endpoint_verify)
 
-    inspect_parser = subparsers.add_parser("inspect")
+    inspect_parser = subparsers.add_parser(
+        "inspect",
+        help="执行 capability 化治理与巡检。",
+        description="执行治理、巡检、统计类 capability，支持时间范围和常见筛选参数。",
+        epilog="Examples:\n  " + "\n  ".join(INSPECT_EXAMPLES),
+        formatter_class=CLIHelpFormatter,
+    )
     inspect_parser.add_argument("--capability", required=True)
-    inspect_parser.add_argument("--filters")
+    _add_time_filter_arguments(inspect_parser)
+    inspect_parser.add_argument("--search", help="搜索关键字。")
+    inspect_parser.add_argument("--user", help="用户名或显示名。")
+    inspect_parser.add_argument("--user-id", dest="user_id", help="用户 UUID。")
+    inspect_parser.add_argument("--asset", help="资产名称、地址或关键字。")
+    inspect_parser.add_argument("--asset-keywords", dest="asset_keywords", help="敏感资产关键字。")
+    inspect_parser.add_argument("--status", help="状态过滤。")
+    inspect_parser.add_argument("--direction", help="方向过滤，例如 upload / download。")
+    inspect_parser.add_argument("--keyword", help="关键字过滤。")
+    inspect_parser.add_argument("--protocol", help="协议过滤。")
+    _add_pagination_arguments(inspect_parser)
+    inspect_parser.add_argument("--top", type=int, help="排行类场景返回前 N 条。")
+    add_filter_arguments(inspect_parser)
     inspect_parser.set_defaults(func=_inspect)
 
-    capabilities_parser = subparsers.add_parser("capabilities")
+    capabilities_parser = subparsers.add_parser(
+        "capabilities",
+        help="列出 inspect capability 目录。",
+        description="输出所有由 jms_diagnose.py inspect 支持的 capability。",
+        formatter_class=CLIHelpFormatter,
+    )
     capabilities_parser.set_defaults(func=_capabilities)
     return parser
 

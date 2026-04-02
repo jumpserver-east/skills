@@ -43,7 +43,13 @@ from .jms_analytics import (
     resolve_command_storage_context,
     suspicious_operation_summary,
 )
-from .jms_runtime import CLIError, GLOBAL_ORG_ID, list_accessible_orgs, parse_bool
+from .jms_runtime import (
+    CLIError,
+    GLOBAL_ORG_ID,
+    build_cli_guidance_payload,
+    list_accessible_orgs,
+    parse_bool,
+)
 
 
 SKILL_DIR = Path(__file__).resolve().parents[2]
@@ -90,6 +96,8 @@ COMPONENT_PREFIX_RE = re.compile(r"^\[([^\[\]]+)\]")
 LOGIN_REMAINING_TRIES_RE = re.compile(r"try\s+(\d+)\s+times?", re.IGNORECASE)
 LOGIN_LOCKED_REASON_TEXT = "账号已锁定，请联系管理员解锁或 5 分钟后重试"
 LOGIN_INVALID_CREDENTIALS_TEXT = "用户名或密码错误"
+REPORT_ORG_SELECTION_REASON_CODE = "report_organization_not_accessible"
+REPORT_DATE_ARGUMENT_REASON_CODE = "invalid_report_date_arguments"
 
 
 def _local_now() -> datetime:
@@ -148,20 +156,56 @@ def extract_template_fields(template_html: str) -> list[str]:
     return sorted(set(PLACEHOLDER_RE.findall(template_html)))
 
 
-def _normalize_report_org_context(org_id: str | None) -> dict[str, Any]:
+def _normalize_report_org_context(org_id: str | None, org_name: str | None = None) -> dict[str, Any]:
     accessible_orgs = list_accessible_orgs()
-    target_org_id = str(org_id or GLOBAL_ORG_ID).strip()
-    selected = next((item for item in accessible_orgs if str(item.get("id") or "").strip() == target_org_id), None)
-    if selected is None:
+    requested_org_id = str(org_id or "").strip()
+    requested_org_name = str(org_name or "").strip()
+    if requested_org_id and requested_org_name:
         raise CLIError(
-            "Organization %s is not accessible in the current environment." % target_org_id,
-            payload={
-                "requested_org_id": target_org_id,
-                "candidate_orgs": accessible_orgs,
-            },
+            "报告组织参数冲突。",
+            payload=build_cli_guidance_payload(
+                REPORT_DATE_ARGUMENT_REASON_CODE,
+                user_message="报告生成只能使用 `--org-id` 或 `--org-name` 其中一个。",
+                action_hint="请保留一个组织定位参数后重试。",
+                org_id=requested_org_id,
+                org_name=requested_org_name,
+            ),
         )
+    if requested_org_id:
+        matches = [item for item in accessible_orgs if str(item.get("id") or "").strip() == requested_org_id]
+    elif requested_org_name:
+        wanted = requested_org_name.lower()
+        matches = [item for item in accessible_orgs if str(item.get("name") or "").strip().lower() == wanted]
+    else:
+        matches = [item for item in accessible_orgs if str(item.get("id") or "").strip() == GLOBAL_ORG_ID]
+
+    if not matches:
+        raise CLIError(
+            "当前环境下无法访问目标报告组织。",
+            payload=build_cli_guidance_payload(
+                REPORT_ORG_SELECTION_REASON_CODE,
+                user_message="当前账号下找不到你指定的报告组织，请先确认可访问组织范围。",
+                action_hint="可以先执行 `python3 scripts/jumpserver_api/jms_diagnose.py ping` 查看 `candidate_orgs`，再改用精确的 `--org-id` 或 `--org-name`。",
+                org_id=requested_org_id or None,
+                org_name=requested_org_name or None,
+                candidate_orgs=accessible_orgs,
+            ),
+        )
+    if len(matches) > 1:
+        raise CLIError(
+            "给定的报告组织名称匹配到多个候选组织。",
+            payload=build_cli_guidance_payload(
+                REPORT_ORG_SELECTION_REASON_CODE,
+                user_message="当前 `--org-name` 命中了多个组织，请改用更精确的名称或直接使用 `--org-id`。",
+                action_hint="建议先从 `candidate_orgs` 中复制准确的 org_id。",
+                org_name=requested_org_name or None,
+                candidate_orgs=matches[:10],
+            ),
+        )
+    selected = matches[0]
+    target_org_id = str(selected.get("id") or "").strip() or GLOBAL_ORG_ID
     effective_org = dict(selected)
-    effective_org["source"] = "explicit" if org_id else "report_default_global"
+    effective_org["source"] = "explicit" if requested_org_id or requested_org_name else "report_default_global"
     switchable_orgs = [
         item
         for item in accessible_orgs
@@ -238,11 +282,33 @@ def _normalize_time_window(
         ]
     )
     if modes != 1:
-        raise CLIError("Provide exactly one of --date, --period, or --date-from/--date-to.")
+        raise CLIError(
+            "报告时间参数不完整或互相冲突。",
+            payload=build_cli_guidance_payload(
+                REPORT_DATE_ARGUMENT_REASON_CODE,
+                user_message="`daily-usage` 只能三选一：`--date`、`--period`、或 `--date-from + --date-to`。",
+                action_hint="请只保留一种时间写法后重试。",
+                suggested_commands=[
+                    "python3 scripts/jumpserver_api/jms_report.py daily-usage --date 20260310",
+                    "python3 scripts/jumpserver_api/jms_report.py daily-usage --period 上周",
+                    "python3 scripts/jumpserver_api/jms_report.py daily-usage --date-from '2026-03-10 00:00:00' --date-to '2026-03-24 23:59:59'",
+                ],
+            ),
+        )
 
     if str(date_from_expr or "").strip() or str(date_to_expr or "").strip():
         if not str(date_from_expr or "").strip() or not str(date_to_expr or "").strip():
-            raise CLIError("Both --date-from and --date-to are required for explicit ranges.")
+            raise CLIError(
+                "显式时间范围参数不完整。",
+                payload=build_cli_guidance_payload(
+                    REPORT_DATE_ARGUMENT_REASON_CODE,
+                    user_message="显式时间范围必须同时提供 `--date-from` 和 `--date-to`。",
+                    action_hint="请把开始时间和结束时间成对传入。",
+                    suggested_commands=[
+                        "python3 scripts/jumpserver_api/jms_report.py daily-usage --date-from '2026-03-10 00:00:00' --date-to '2026-03-24 23:59:59'",
+                    ],
+                ),
+            )
         date_from = _parse_datetime_expr(str(date_from_expr), end_of_day=False)
         date_to = _parse_datetime_expr(str(date_to_expr), end_of_day=True)
     elif str(date_expr or "").strip():
@@ -259,12 +325,26 @@ def _normalize_time_window(
             period_start = now.date().replace(day=1)
             period_end = now.date()
         else:
-            raise CLIError("Unsupported period expression: %s" % period)
+            raise CLIError(
+                "暂不支持的周期表达：%s" % period,
+                payload=build_cli_guidance_payload(
+                    REPORT_DATE_ARGUMENT_REASON_CODE,
+                    user_message="当前 `--period` 只支持 `上周` 和 `本月`。",
+                    action_hint="请改用支持的周期表达，或改用 `--date` / `--date-from` + `--date-to`。",
+                ),
+            )
         date_from = datetime(period_start.year, period_start.month, period_start.day, 0, 0, 0, tzinfo=now.tzinfo)
         date_to = datetime(period_end.year, period_end.month, period_end.day, 23, 59, 59, tzinfo=now.tzinfo)
 
     if date_to < date_from:
-        raise CLIError("date_to must be greater than or equal to date_from.")
+        raise CLIError(
+            "报告时间范围非法。",
+            payload=build_cli_guidance_payload(
+                REPORT_DATE_ARGUMENT_REASON_CODE,
+                user_message="`date_to` 必须大于或等于 `date_from`。",
+                action_hint="请检查开始时间和结束时间是否写反。",
+            ),
+        )
 
     report_date = date_to.date().isoformat()
     generated_at = now.strftime("%Y-%m-%d %H:%M:%S")
@@ -1004,6 +1084,7 @@ def _build_minimal_context(
     date_from_expr: str | None,
     date_to_expr: str | None,
     org_id: str | None,
+    org_name: str | None,
     command_storage_id: str | None,
 ) -> dict[str, Any]:
     runtime_context = _normalize_time_window(
@@ -1012,7 +1093,7 @@ def _build_minimal_context(
         date_from_expr=date_from_expr,
         date_to_expr=date_to_expr,
     )
-    org_context = _normalize_report_org_context(org_id)
+    org_context = _normalize_report_org_context(org_id, org_name)
     filters = {
         "date_from": runtime_context["date_from"],
         "date_to": runtime_context["date_to"],
@@ -1230,6 +1311,7 @@ def build_daily_usage_report(
     date_from_expr: str | None = None,
     date_to_expr: str | None = None,
     org_id: str | None = None,
+    org_name: str | None = None,
     command_storage_id: str | None = None,
 ) -> dict[str, Any]:
     context = _build_minimal_context(
@@ -1238,6 +1320,7 @@ def build_daily_usage_report(
         date_from_expr=date_from_expr,
         date_to_expr=date_to_expr,
         org_id=org_id,
+        org_name=org_name,
         command_storage_id=command_storage_id,
     )
     metadata = load_report_metadata()

@@ -13,6 +13,21 @@ description: JumpServer V4.10 查询与分析 skill。Use when users ask to quer
 
 这是查询与分析 skill。允许本地运行时写入 `config-write --confirm` 和 `select-org --confirm`。不执行 JumpServer 业务写操作。
 
+## Quick Examples
+
+优先使用显式参数；需要补充高级筛选时再用重复的 `--filter key=value`；`--filters '{"key":"value"}'` 仅兼容旧写法。
+
+```bash
+python3 scripts/jumpserver_api/jms_diagnose.py select-org --org-name Default
+python3 scripts/jumpserver_api/jms_diagnose.py user-assets --org-name Default --username gusiqing
+python3 scripts/jumpserver_api/jms_query.py object-list --resource organization --name Default --limit 5
+python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability session-record-query --days 7 --user gusiqing --limit 20
+python3 scripts/jumpserver_api/jms_diagnose.py reports --report-type account-statistic --days 30
+python3 scripts/jumpserver_api/jms_report.py daily-usage --period 上周 --org-name Default
+```
+
+阻塞或参数错误时，优先看返回里的 `reason_code`、`user_message`、`action_hint`、`suggested_commands`，不要只看顶层 `error`。
+
 ## Route First
 
 按下面顺序判路由。上面的规则优先于下面的规则。
@@ -50,6 +65,14 @@ description: JumpServer V4.10 查询与分析 skill。Use when users ask to quer
 3. “分析”不等于自由文本优先。带时间范围的使用分析、情况概览或排行类问题，默认先产出完整 HTML 报告；摘要只能作为补充，不能替代报告。
 4. 只要 `daily-usage` 成功返回，就必须先告诉用户“报告已生成”，并回显报告文件路径、文件存在性/大小、模板路径、元数据路径、时间范围、组织和 `validation_summary`；不允许后台生成 HTML 却只给文字摘要。
 
+### 模板报告后的数据总结
+
+- 当正式入口已成功生成 HTML 报告，若还要补充文字摘要，必须基于正式工具输出里的 `result.summary`、`records` 或其他结构化结果字段，不基于猜测。
+- 优先读取 `result.summary` 这类总量字段；只有在它不足以回答问题时，才继续展开 `records` 或其他明细。
+- 不要只看 HTML 静态内容下结论；HTML 是展示结果，统计口径仍以工具返回的数据为准。
+- 若 `top_users`、`top_assets` 或其他 ranking 是 Top N / 被 `top` 截断 / 只返回部分榜单，必须明确说明“这只是部分榜单，不能替代总量”。
+- 若榜单明确覆盖全量分布，才允许把 `summary.total` 与榜单求和做一致性校验；否则只能保守描述“根据已返回榜单/样本数据”。
+
 ## Organization Priority
 
 按下面顺序处理组织。上面的规则优先于下面的规则。
@@ -82,6 +105,16 @@ description: JumpServer V4.10 查询与分析 skill。Use when users ask to quer
 - “某用户某天连接过哪些机器 / 某天会话数” 这类问题，优先返回两套口径：`session_count` 与去重后的 `assets`；机器列表用去重资产，不要把会话条数直接说成机器数。若先解析了用户对象，解析出的 UUID 要放进 `filters.user_id`，不要回写到 `filters.user`。
 - 模板化使用报告/使用分析请求必须先走 `python3 scripts/jumpserver_api/jms_report.py daily-usage ...`；它会负责时间归一化、组织处理、字段元数据取数、模板填充和生成后自检。普通查询优先只选 1 个正式入口。
 
+## Statistical Guidelines
+
+- 先看权威总量字段：`summary.total`、`summary.total_sessions`、`summary.total_users`、`summary.total_assets`；再看 `top_users`、`top_assets`、`ranking` 一类榜单字段。
+- 用户问“某天连接了哪些机器”时，优先从 `records` 推导“用户 -> 去重资产列表”；不要只看 `top_assets` 就回答机器清单。
+- `session_count`、去重后的 `assets`、活跃用户数、被访问资产数是不同统计口径，回答时要分别标注来源，不要互相替代。
+- 若 `top_users`、`top_assets` 或 ranking 明显是 Top N、被 `top` 截断、或语义上只是排行，禁止把其求和后直接当总数。
+- 只有在榜单明确覆盖全量分布时，才允许用 `len(top_users)` 推导活跃用户数，或用 `len(top_assets)` 推导被访问资产数；否则只能说“已返回榜单中的用户数/资产数”。
+- 不要把单个用户的会话数、单个资产的访问次数，或榜单第一名的计数，当成整体总量。
+- 继续保留两套口径回答：会话问题看 `session_count` 或总会话字段，机器问题看去重后的 `assets`；不要把会话条数直接说成机器数。
+
 ## Guardrails
 
 - 不生成临时 SDK Python 脚本或 HTTP 脚本。
@@ -96,6 +129,25 @@ description: JumpServer V4.10 查询与分析 skill。Use when users ask to quer
 - 模板化报告请求必须优先使用 `python3 scripts/jumpserver_api/jms_report.py daily-usage ...`；不要现场写临时拼装逻辑。若正式入口缺失，应先补齐正式入口，再使用它。
 - 模板化报告请求只使用字段元数据里声明的来源，不用 Markdown 模板替代 HTML 模板。
 - 模板化报告请求中的命令审计字段，未显式给 `command_storage_id` 时默认汇总全部可访问 command storage；普通命令审计查询仍沿用默认 storage / 单个 storage / 多 storage 阻塞逻辑。
+
+### 统计与报告类错误（严禁）
+
+- 不要把单个用户的会话数说成“总会话数”。
+- 不要把单个资产的被访问次数说成“总资产数”或“总访问量”。
+- 不要只看 `top_users[0]`、`top_assets[0]` 或榜单第一名，就下“只有 X 位用户 / 只有 Y 台机器 / 总共 Z 次会话”的结论。
+- 不要忽略 `top_users`、`top_assets` 或 ranking 列表中除第一个外的其他条目。
+- 只有在 `top_users` 明确覆盖全量时，才能把 `len(top_users)` 当作活跃用户数；否则只能说“已返回榜单中的用户数”。
+- 只有在 `top_assets` 明确覆盖全量时，才能把 `len(top_assets)` 当作被访问资产数；否则只能说“已返回榜单中的资产数”。
+- 当用户问“某天连接了哪些机器”时，不要用 `top_assets` 替代 `records`；必须从 `records` 推导用户与资产的去重关系。
+
+### 数据验证（必须执行）
+
+- 在给出任何数字结论前，先确认这个数字来自 `summary`、全量 `records`，还是 Top N / 部分榜单。
+- 若返回了 `summary.total` 且同时返回完整用户分布、完整资产分布，必须交叉验证：总量、用户之和、资产之和三者一致后再下结论。
+- 若返回的只是 Top N 或部分榜单，必须明确说明其不代表总量，不能把榜单求和或榜单长度当作全局结论。
+- 若要报告“活跃用户数”“被访问资产数”，先确认列表是否覆盖全量；不能确认时，降级成“已返回榜单/样本中的数量”。
+- 若要回答“某用户连接了哪些机器”，先按用户从 `records` 分组，再提取去重资产；不要跳过明细直接看排行。
+- 在汇总结论前，先自检：这个数字来自哪里、它是单条值还是总和、我是否遍历了所有相关条目、我是否已经说明这是全量还是部分榜单。
 
 ## Respond With
 
@@ -134,6 +186,31 @@ description: JumpServer V4.10 查询与分析 skill。Use when users ask to quer
 - `candidate_orgs` 或 `candidate_objects`
 - 下一步安全动作
 
+## Data Validation
+
+### 全量可验证场景
+
+- 若返回了 `summary.total` 或同类总量字段，且 `top_users`、`top_assets` 或其他分布列表明确覆盖全量，必须交叉验证用户之和、资产之和与总量一致。
+- 若三者不一致，先说明差异和各自口径，再分别列出；不要强行合并成一个数字。
+- 报告“X 位用户，共 Y 次会话”这类结论前，先确认 X 来自全量用户分布或全量 `records`，Y 来自总量字段或全量求和，而不是某个单条记录。
+
+### 部分榜单场景
+
+- 若 `top_users`、`top_assets` 或 ranking 只是 Top N、被 `top` 截断、或语义上明显只是排行，必须明确说明“这是部分榜单，不能替代总量”。
+- 这类场景下不要把榜单求和写成总会话数，不要把 `len(top_users)` 写成全部活跃用户数，也不要把 `len(top_assets)` 写成全部被访问资产数。
+- 结论措辞必须降级为“根据已返回榜单/样本数据”或“已返回的 Top 用户/资产中”，不能直接给全局判断。
+
+### 会话-用户一致性检查
+
+- 不要把某个用户的会话数说成总会话数；例如榜首用户有 `23` 次会话，不等于系统里总共只有 `23` 次会话。
+- 只有在用户列表明确覆盖全量时，才能把用户计数求和后和总量对齐；否则只能说“已返回榜单中的若干用户共贡献了 X 次会话”。
+
+### 用户-资产连接矩阵
+
+- 当用户问“某天连接了哪些机器”时，先从 `records` 按用户分组，再提取每个用户对应的去重资产名称。
+- 报告格式优先写成“用户 -> 机器列表”，不要直接把 `top_assets` 当作某个用户的连接矩阵。
+- 只有在缺少 `records` 且工具明确只返回部分榜单时，才能保守表述“根据已返回榜单/样本数据”，不要伪造全量结论。
+
 ## References
 
 - [普通路由与阻塞规则](references/routing-playbook.md)
@@ -141,3 +218,12 @@ description: JumpServer V4.10 查询与分析 skill。Use when users ask to quer
 - [运行入口与环境](references/runtime.md)
 - [诊断与访问分析](references/diagnose.md)
 - [安全规则](references/safety-rules.md)
+
+## Response Checklist
+
+- [ ] 我是否先确认了数字来自 `summary`、全量 `records`，还是 Top N / 部分榜单？
+- [ ] 如果拿榜单做推断，我是否先确认它覆盖全量，而不是默认把 Top N 当成总量？
+- [ ] 如果存在 `summary.total` 和完整分布，我是否做了用户之和、资产之和、总量的交叉验证？
+- [ ] 我是否避免了把单个用户会话数、单个资产访问次数、或榜单第一名的 count 说成总数？
+- [ ] 如果回答“某天连接了哪些机器”，我是否从 `records` 去重推导，而不是只看 `top_assets`？
+- [ ] 当只能看到部分数据时，我是否明确写出“根据已返回榜单/样本数据”这类保守措辞？

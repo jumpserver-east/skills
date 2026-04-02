@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from datetime import date, datetime, time, timedelta, timezone, tzinfo
+import hashlib
 import json
 import re
 from typing import Any
@@ -9,6 +10,7 @@ from typing import Any
 from .jms_capabilities import CAPABILITY_BY_ID
 from .jms_runtime import (
     CLIError,
+    build_cli_guidance_payload,
     create_client,
     create_discovery,
     ensure_selected_org_context,
@@ -495,6 +497,36 @@ def _server_filters(filters: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
+def _format_jumpserver_api_datetime(value: Any) -> str | None:
+    parsed = parse_datetime_value(value)
+    if parsed is None:
+        return None
+    return parsed.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def _operate_audit_server_filters(filters: dict[str, Any]) -> dict[str, Any]:
+    payload = _server_filters(filters)
+    payload.pop("days", None)
+    if payload.get("date_from") not in {None, ""}:
+        payload["date_from"] = _format_jumpserver_api_datetime(payload.get("date_from")) or payload["date_from"]
+    if payload.get("date_to") not in {None, ""}:
+        payload["date_to"] = _format_jumpserver_api_datetime(payload.get("date_to")) or payload["date_to"]
+    return payload
+
+
+def _command_audit_server_filters(filters: dict[str, Any]) -> dict[str, Any]:
+    payload = _server_filters(filters)
+    payload.pop("days", None)
+    payload.setdefault("order", "-timestamp")
+    payload.setdefault("display", 1)
+    payload.setdefault("draw", 1)
+    if payload.get("date_from") not in {None, ""}:
+        payload["date_from"] = _format_jumpserver_api_datetime(payload.get("date_from")) or payload["date_from"]
+    if payload.get("date_to") not in {None, ""}:
+        payload["date_to"] = _format_jumpserver_api_datetime(payload.get("date_to")) or payload["date_to"]
+    return payload
+
+
 def _top(counter: Counter, *, limit: int = 10) -> list[dict[str, Any]]:
     items = []
     for key, count in counter.most_common(limit):
@@ -696,27 +728,264 @@ def _with_command_storage_context(result: dict[str, Any], filters: dict[str, Any
     return payload
 
 
+def _command_record_storage_id(item: dict[str, Any], *, fallback: Any = None) -> str:
+    for candidate in (fallback, item.get("command_storage_id"), item.get("_command_storage_id")):
+        value = str(candidate or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def _command_record_session_id(item: dict[str, Any]) -> str:
+    return str(_first_field(item, "session", "session_id") or "").strip()
+
+
+def _command_record_timestamp(item: dict[str, Any]) -> int:
+    raw = item.get("timestamp")
+    if raw not in {None, ""}:
+        try:
+            return int(float(raw))
+        except (TypeError, ValueError):
+            pass
+    parsed = _extract_datetime(item)
+    if parsed is not None:
+        return int(parsed.timestamp())
+    return 0
+
+
+def _command_record_risk_level_value(item: dict[str, Any]) -> int:
+    raw = _first_field(item, "risk_level.value", "risk_level")
+    if isinstance(raw, dict):
+        raw = raw.get("value")
+    try:
+        return int(raw or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _command_record_stable_payload(item: dict[str, Any], *, command_storage_id: str | None = None, include_storage: bool = True) -> dict[str, Any]:
+    payload = {
+        "org_id": str(item.get("org_id") or "").strip(),
+        "user": str(item.get("user") or "").strip(),
+        "asset": str(item.get("asset") or "").strip(),
+        "account": str(item.get("account") or "").strip(),
+        "session": _command_record_session_id(item),
+        "timestamp": _command_record_timestamp(item),
+        "input": str(item.get("input") or "").strip(),
+        "remote_addr": str(_first_field(item, "remote_addr", "remote_address", "src_ip", "source_ip") or "").strip(),
+        "risk_level": _command_record_risk_level_value(item),
+    }
+    if include_storage:
+        payload["command_storage_id"] = _command_record_storage_id(item, fallback=command_storage_id)
+    return payload
+
+
+def _command_record_sha1(payload: dict[str, Any]) -> str:
+    encoded = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"), default=str).encode("utf-8")
+    return hashlib.sha1(encoded).hexdigest()
+
+
+def _build_command_record_stable_id(item: dict[str, Any], *, command_storage_id: str | None = None) -> str:
+    payload = _command_record_stable_payload(item, command_storage_id=command_storage_id, include_storage=True)
+    storage_id = str(payload.get("command_storage_id") or "").strip() or "-"
+    session_id = str(payload.get("session") or "").strip() or "-"
+    timestamp = int(payload.get("timestamp") or 0)
+    return "cmdrec:v1:%s:%s:%s:%s" % (storage_id, session_id, timestamp, _command_record_sha1(payload))
+
+
+def _parse_command_record_stable_id(value: Any) -> dict[str, Any] | None:
+    text = str(value or "").strip()
+    parts = text.split(":")
+    if len(parts) != 6 or parts[0] != "cmdrec" or parts[1] != "v1":
+        return None
+    try:
+        timestamp = int(parts[4])
+    except (TypeError, ValueError):
+        return None
+    digest = str(parts[5] or "").strip().lower()
+    if len(digest) != 40 or any(ch not in "0123456789abcdef" for ch in digest):
+        return None
+    storage_id = str(parts[2] or "").strip()
+    session_id = str(parts[3] or "").strip()
+    return {
+        "storage_id": None if storage_id in {"", "-"} else storage_id,
+        "session_id": None if session_id in {"", "-"} else session_id,
+        "timestamp": timestamp,
+        "sha1": digest,
+        "stable_id": text,
+    }
+
+
+def _normalize_command_record(item: dict[str, Any], *, command_storage_id: str | None = None) -> dict[str, Any]:
+    cloned = dict(item)
+    storage_id = _command_record_storage_id(cloned, fallback=command_storage_id)
+    existing_source_row_id = str(cloned.get("source_row_id") or "").strip()
+    current_id = str(cloned.get("id") or "").strip()
+    if existing_source_row_id:
+        cloned["source_row_id"] = existing_source_row_id
+    elif current_id and _parse_command_record_stable_id(current_id) is None:
+        cloned["source_row_id"] = current_id
+    if storage_id:
+        cloned["command_storage_id"] = storage_id
+        cloned.setdefault("_command_storage_id", storage_id)
+    cloned["id"] = _build_command_record_stable_id(cloned, command_storage_id=storage_id)
+    return cloned
+
+
+def _command_record_merge_identity(item: dict[str, Any]) -> str:
+    payload = _command_record_stable_payload(item, include_storage=False)
+    return "merge:%s" % _command_record_sha1(payload)
+
+
 def _command_record_identity(item: dict[str, Any]) -> str:
-    record_id = str(item.get("id") or "").strip()
-    if record_id:
-        return "id:%s" % record_id
-    stable_payload = {key: value for key, value in item.items() if key not in {"_command_storage_id"}}
-    return "json:%s" % json.dumps(stable_payload, sort_keys=True, ensure_ascii=False, default=str)
+    parsed = _parse_command_record_stable_id(item.get("id"))
+    if parsed is not None:
+        return "stable:%s" % parsed["stable_id"]
+    return "stable:%s" % _build_command_record_stable_id(item)
+
+
+def _command_query_records(client, query_payload: dict[str, Any], *, follow_all: bool) -> list[dict[str, Any]]:
+    page_limit = int(query_payload.get("limit") or 100)
+    offset = int(query_payload.get("offset") or 0)
+    max_pages = 200
+    records: list[dict[str, Any]] = []
+
+    for _ in range(max_pages):
+        page = client.get(TERMINAL_COMMANDS_PATH, params=query_payload)
+        if isinstance(page, dict) and isinstance(page.get("results"), list):
+            page_records = [item for item in page.get("results") or [] if isinstance(item, dict)]
+        elif isinstance(page, list):
+            page_records = [item for item in page if isinstance(item, dict)]
+        else:
+            page_records = []
+        records.extend(page_records)
+        if not follow_all or len(page_records) < page_limit:
+            break
+        offset += len(page_records)
+        query_payload = {**query_payload, "limit": page_limit, "offset": offset}
+    return records
+
+
+def _fetch_command_records_for_session(session_id: str, *, page_limit: int = 200) -> list[dict[str, Any]]:
+    session_value = str(session_id or "").strip()
+    if not session_value:
+        return []
+    client = create_client()
+    return _command_query_records(
+        client,
+        {
+            "session_id": session_value,
+            "limit": page_limit,
+            "offset": 0,
+            "display": 1,
+            "draw": 1,
+        },
+        follow_all=True,
+    )
+
+
+def _command_record_time_windows(timestamp: int) -> list[tuple[datetime, datetime]]:
+    record_time = datetime.fromtimestamp(int(timestamp or 0), tz=timezone.utc)
+    narrow_start = record_time - timedelta(minutes=5)
+    narrow_end = record_time + timedelta(minutes=5)
+    day_start = datetime.combine(record_time.date(), time.min, tzinfo=timezone.utc)
+    day_end = datetime.combine(record_time.date(), time.max, tzinfo=timezone.utc)
+    return [(narrow_start, narrow_end), (day_start, day_end)]
+
+
+def _fetch_command_records_for_storage_and_window(
+    command_storage_id: str,
+    *,
+    date_from: datetime,
+    date_to: datetime,
+    page_limit: int = 200,
+) -> list[dict[str, Any]]:
+    storage_id = str(command_storage_id or "").strip()
+    if not storage_id:
+        return []
+    client = create_client()
+    query_payload = _command_audit_server_filters(
+        {
+            "command_storage_id": storage_id,
+            "date_from": date_from,
+            "date_to": date_to,
+            "limit": page_limit,
+            "offset": 0,
+        }
+    )
+    return _command_query_records(client, query_payload, follow_all=True)
+
+
+def _legacy_fetch_command_record_by_raw_id(record_id: str, filters: dict[str, Any]) -> dict[str, Any]:
+    payload = _normalize_time_filters(filters or {})
+    target_id = str(record_id or "").strip()
+    if not target_id:
+        raise CLIError("Command audit record id is required.")
+
+    storage_context = resolve_command_storage_context(payload)
+    storage_ids = []
+    selected_storage_id = str(storage_context.get("selected_command_storage_id") or "").strip()
+    if selected_storage_id:
+        storage_ids.append(selected_storage_id)
+    for item in storage_context.get("available_command_storages") or []:
+        candidate = str((item or {}).get("id") or "").strip()
+        if candidate and candidate not in storage_ids:
+            storage_ids.append(candidate)
+    if not storage_ids:
+        storage_ids.append("")
+
+    client = create_client()
+    page_limit = 200
+    max_pages = 100
+
+    for storage_id in storage_ids:
+        for page_index in range(max_pages):
+            query_payload = _command_audit_server_filters(
+                {
+                    "command_storage_id": storage_id,
+                    "limit": page_limit,
+                    "offset": page_index * page_limit,
+                }
+            )
+            page = client.get(TERMINAL_COMMANDS_PATH, params=query_payload)
+            if isinstance(page, dict) and isinstance(page.get("results"), list):
+                records = [item for item in page.get("results") or [] if isinstance(item, dict)]
+            elif isinstance(page, list):
+                records = [item for item in page if isinstance(item, dict)]
+            else:
+                records = []
+            for item in records:
+                if str(item.get("id") or "").strip() != target_id:
+                    continue
+                return _normalize_command_record(item, command_storage_id=storage_id)
+            if len(records) < page_limit:
+                break
+
+    raise CLIError(
+        "Command audit record not found.",
+        payload={
+            "record_id": target_id,
+            "queried_command_storage_ids": storage_ids,
+        },
+    )
 
 
 def _fetch_command_records_for_storage(payload: dict[str, Any], *, command_storage_id: str | None = None) -> list[dict[str, Any]]:
-    server_payload = _drop_local_time_only_filters(dict(payload))
+    server_payload = _command_audit_server_filters(_drop_local_time_only_filters(dict(payload)))
     if command_storage_id not in {None, ""}:
         server_payload["command_storage_id"] = command_storage_id
     elif server_payload.get("command_storage_id") in {None, ""}:
         server_payload.pop("command_storage_id", None)
-    records = _apply_common_filters(_fetch_list(TERMINAL_COMMANDS_PATH, server_payload), payload)
+    client = create_client()
+    records = _command_query_records(
+        client,
+        server_payload,
+        follow_all=payload.get("limit") in {None, ""} and payload.get("offset") in {None, ""},
+    )
+    records = _apply_common_filters(records, payload)
     final: list[dict[str, Any]] = []
     for item in records:
-        cloned = dict(item)
-        if command_storage_id not in {None, ""}:
-            cloned.setdefault("_command_storage_id", str(command_storage_id))
-        final.append(cloned)
+        final.append(_normalize_command_record(item, command_storage_id=str(command_storage_id or "").strip() or None))
     return final
 
 
@@ -731,7 +1000,7 @@ def _fetch_command_records(filters: dict[str, Any]) -> list[dict[str, Any]]:
             if not storage_id:
                 continue
             for record in _fetch_command_records_for_storage(payload, command_storage_id=storage_id):
-                record_identity = _command_record_identity(record)
+                record_identity = _command_record_merge_identity(record)
                 if record_identity in seen_record_ids:
                     continue
                 seen_record_ids.add(record_identity)
@@ -749,6 +1018,44 @@ def _fetch_command_records(filters: dict[str, Any]) -> list[dict[str, Any]]:
         records = [item for item in records if int(_first_field(item, "risk_level.value", "risk_level") or 0) >= threshold]
     records.sort(key=lambda item: _extract_datetime(item) or datetime.fromtimestamp(0, tz=timezone.utc), reverse=True)
     return records
+
+
+def _fetch_command_record_by_id(record_id: str, filters: dict[str, Any] | None = None) -> dict[str, Any]:
+    target_id = str(record_id or "").strip()
+    if not target_id:
+        raise CLIError("Command audit record id is required.")
+    parsed = _parse_command_record_stable_id(target_id)
+    if parsed is None:
+        return _legacy_fetch_command_record_by_raw_id(target_id, filters or {})
+
+    session_id = parsed.get("session_id")
+    storage_id = str(parsed.get("storage_id") or "").strip()
+    if session_id:
+        for item in _fetch_command_records_for_session(session_id):
+            record = _normalize_command_record(item, command_storage_id=storage_id or None)
+            if record["id"] == target_id:
+                return record
+
+    if storage_id:
+        for date_from, date_to in _command_record_time_windows(int(parsed.get("timestamp") or 0)):
+            for item in _fetch_command_records_for_storage_and_window(
+                storage_id,
+                date_from=date_from,
+                date_to=date_to,
+            ):
+                record = _normalize_command_record(item, command_storage_id=storage_id)
+                if record["id"] == target_id:
+                    return record
+
+    raise CLIError(
+        "Command audit record not found.",
+        payload={
+            "record_id": target_id,
+            "lookup_strategy": "stable_id",
+            "session_id": session_id,
+            "command_storage_id": storage_id or None,
+        },
+    )
 
 
 def _fetch_terminal_session_records(filters: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
@@ -854,9 +1161,25 @@ def _resolve_user(
     wanted = _lower(username or target)
     matches = [item for item in users if wanted and wanted in {_lower(item.get("username")), _lower(item.get("name"))}]
     if not matches:
-        raise CLIError("Unable to resolve user from the provided identifier.", payload={"user": username or target})
+        raise CLIError(
+            "无法解析用户标识。",
+            payload=build_cli_guidance_payload(
+                "user_not_found",
+                user_message="当前组织下找不到你指定的用户，请改用更精确的用户名、显示名或用户 UUID。",
+                action_hint="可以先用 `resolve --resource user --name <用户名>` 确认唯一用户对象。",
+                user=username or target,
+            ),
+        )
     if len(matches) > 1:
-        raise CLIError("Multiple users matched the provided identifier.", payload={"candidates": matches[:10]})
+        raise CLIError(
+            "用户标识匹配到多个候选对象。",
+            payload=build_cli_guidance_payload(
+                "ambiguous_user",
+                user_message="当前输入命中了多个用户，请改用更精确的用户名或直接使用用户 UUID。",
+                action_hint="建议先执行 `resolve --resource user --name <关键字>` 查看候选对象。",
+                candidates=matches[:10],
+            ),
+        )
     return matches[0]
 
 
@@ -875,9 +1198,25 @@ def _resolve_asset(
     wanted = _lower(name or target)
     matches = [item for item in assets if wanted and wanted in {_lower(item.get("name")), _lower(item.get("address"))}]
     if not matches:
-        raise CLIError("Unable to resolve asset from the provided identifier.", payload={"asset": name or target})
+        raise CLIError(
+            "无法解析资产标识。",
+            payload=build_cli_guidance_payload(
+                "asset_not_found",
+                user_message="当前组织下找不到你指定的资产，请改用更精确的资产名称、地址或资产 UUID。",
+                action_hint="可以先用 `resolve --resource asset --name <资产名>` 确认唯一资产对象。",
+                asset=name or target,
+            ),
+        )
     if len(matches) > 1:
-        raise CLIError("Multiple assets matched the provided identifier.", payload={"candidates": matches[:10]})
+        raise CLIError(
+            "资产标识匹配到多个候选对象。",
+            payload=build_cli_guidance_payload(
+                "ambiguous_asset",
+                user_message="当前输入命中了多个资产，请改用更精确的名称、地址或直接使用资产 UUID。",
+                action_hint="建议先执行 `resolve --resource asset --name <关键字>` 查看候选对象。",
+                candidates=matches[:10],
+            ),
+        )
     return matches[0]
 
 
@@ -2119,7 +2458,14 @@ def terminal_access_policy_check(filters: dict[str, Any]) -> dict[str, Any]:
 def setting_category_query(filters: dict[str, Any]) -> dict[str, Any]:
     category = str(filters.get("category") or "").strip()
     if not category:
-        raise CLIError("setting-category-query requires filters.category, e.g. {\"category\":\"security_auth\"}.")
+        raise CLIError(
+            "缺少设置分类参数。",
+            payload=build_cli_guidance_payload(
+                "missing_setting_category",
+                user_message="请通过 `--category` 指定要查询的设置分类，例如 `security_auth`。",
+                action_hint="推荐使用 `python3 scripts/jumpserver_api/jms_diagnose.py settings-category --category security_auth`。",
+            ),
+        )
     payload = _settings_payload(category=category)
     records = payload if isinstance(payload, list) else [payload]
     records = [item for item in records if item not in (None, "")]
@@ -2204,7 +2550,14 @@ def terminal_component_query(filters: dict[str, Any]) -> dict[str, Any]:
 def report_query(filters: dict[str, Any]) -> dict[str, Any]:
     report_type = str(filters.get("report_type") or "").strip()
     if not report_type:
-        raise CLIError("report-query requires filters.report_type, e.g. {\"report_type\":\"account-statistic\",\"days\":30}.")
+        raise CLIError(
+            "缺少报表类型参数。",
+            payload=build_cli_guidance_payload(
+                "missing_report_type",
+                user_message="请通过 `--report-type` 指定要读取的报表类型。",
+                action_hint="推荐使用 `python3 scripts/jumpserver_api/jms_diagnose.py reports --report-type account-statistic --days 30`。",
+            ),
+        )
     report_paths = {
         "account-statistic": "/api/v1/reports/reports/account-statistic/",
         "account-automation": "/api/v1/reports/reports/account-automation/",
@@ -2217,7 +2570,15 @@ def report_query(filters: dict[str, Any]) -> dict[str, Any]:
     }
     path = report_paths.get(report_type)
     if path is None:
-        raise CLIError("Unsupported report_type: %s" % report_type)
+        raise CLIError(
+            "不支持的报表类型：%s" % report_type,
+            payload=build_cli_guidance_payload(
+                "unsupported_report_type",
+                user_message="当前 `--report-type` 不在支持列表中，请改用帮助页里列出的类型。",
+                action_hint="可先执行 `python3 scripts/jumpserver_api/jms_diagnose.py reports --help` 查看支持值。",
+                report_type=report_type,
+            ),
+        )
     client = create_client()
     payload = client.get(path, params=_server_filters(filters))
     records = payload if isinstance(payload, list) else [payload]

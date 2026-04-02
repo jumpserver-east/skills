@@ -18,9 +18,12 @@ from jumpserver_api.jms_analytics import (
     _asset_filter_evidence,
     _exact_first_filter,
     _extract_filter_diagnostics,
+    _fetch_command_record_by_id,
+    _fetch_command_records,
     _fetch_terminal_session_records,
     _normalize_time_filters,
     _normalize_user_filter_payload,
+    _operate_audit_server_filters,
     _resolve_asset,
     _resolve_user,
     _server_filters,
@@ -30,12 +33,14 @@ from jumpserver_api.jms_analytics import (
 )
 from jumpserver_api.jms_runtime import (
     CLIError,
+    CLIHelpFormatter,
+    add_filter_arguments,
     create_client,
     create_discovery,
     ensure_selected_org_context,
+    merge_filter_args,
     org_context_output,
     parse_bool,
-    parse_json_arg,
     run_and_print,
 )
 
@@ -125,6 +130,34 @@ COMMAND_AUDIT_CAPABILITIES = {
     "command-record-query",
     "high-risk-command-audit",
 }
+
+OBJECT_LIST_EXAMPLES = [
+    "python3 scripts/jumpserver_api/jms_query.py object-list --resource organization --name Default --limit 5",
+    "python3 scripts/jumpserver_api/jms_query.py object-list --resource asset --kind host --search prod --limit 10",
+]
+PERMISSION_LIST_EXAMPLES = [
+    "python3 scripts/jumpserver_api/jms_query.py permission-list --resource asset-permission --name 生产环境授权 --limit 10",
+    "python3 scripts/jumpserver_api/jms_query.py permission-list --resource asset-permission --filter users=jingyu.qi --limit 20",
+]
+ASSET_PERM_USERS_EXAMPLES = [
+    "python3 scripts/jumpserver_api/jms_query.py asset-perm-users --asset-id <asset-id>",
+]
+AUDIT_LIST_EXAMPLES = [
+    "python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type login --days 7 --limit 5",
+    "python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type session --date-from '2026-03-23 00:00:00' --date-to '2026-03-23 23:59:59' --user gusiqing --limit 20",
+]
+TERMINAL_SESSION_EXAMPLES = [
+    "python3 scripts/jumpserver_api/jms_query.py terminal-sessions --view history --days 7 --limit 10",
+    "python3 scripts/jumpserver_api/jms_query.py terminal-sessions --view online --asset demo-host",
+]
+COMMAND_STORAGE_HINT_EXAMPLES = [
+    "python3 scripts/jumpserver_api/jms_query.py command-storage-hint",
+    "python3 scripts/jumpserver_api/jms_query.py command-storage-hint --command-storage-id <storage-id>",
+]
+AUDIT_ANALYZE_EXAMPLES = [
+    "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability session-record-query --days 7 --user gusiqing --limit 20",
+    "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability command-record-query --date-from '2026-03-01 00:00:00' --date-to '2026-03-20 23:59:59' --command-storage-scope all",
+]
 
 
 def _asset_list_path(kind: str | None) -> str:
@@ -287,7 +320,11 @@ def _filter_asset_permission_records_by_user(client, records, user_filter, *, di
 def _object_list(args: argparse.Namespace):
     context = ensure_selected_org_context()
     client = create_client()
-    filters = parse_json_arg(args.filters)
+    filters = merge_filter_args(
+        args,
+        explicit_fields=("name", "search", "limit", "offset"),
+        usage_examples=OBJECT_LIST_EXAMPLES,
+    )
     path = _object_list_path(args.resource, args.kind)
     records = client.list_paginated(path, params=filters)
     records, match_strategy, matched_fields = _apply_local_exact_filters(
@@ -341,10 +378,59 @@ def _permission_brief(item: dict) -> dict:
     }
 
 
+def _add_pagination_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--limit", type=int, help="返回条数上限。")
+    parser.add_argument("--offset", type=int, help="分页偏移量。")
+
+
+def _add_time_filter_arguments(parser: argparse.ArgumentParser, *, include_days: bool = True) -> None:
+    parser.add_argument("--date-from", dest="date_from", help="开始时间，格式如 `2026-03-23 00:00:00`。")
+    parser.add_argument("--date-to", dest="date_to", help="结束时间，格式如 `2026-03-23 23:59:59`。")
+    if include_days:
+        parser.add_argument("--days", type=int, help="最近 N 天；未显式给时间窗时使用。")
+
+
+def _add_common_audit_filter_arguments(
+    parser: argparse.ArgumentParser,
+    *,
+    include_direction: bool = False,
+    include_keyword: bool = False,
+    include_storage: bool = False,
+    include_top: bool = False,
+) -> None:
+    _add_time_filter_arguments(parser)
+    parser.add_argument("--user", help="用户名或显示名。")
+    parser.add_argument("--user-id", dest="user_id", help="用户 UUID。")
+    parser.add_argument("--asset", help="资产名称、地址或关键字。")
+    parser.add_argument("--status", help="状态过滤，例如 `success`、`failed`。")
+    parser.add_argument("--protocol", help="协议过滤，例如 `ssh`。")
+    parser.add_argument("--account", help="账号过滤。")
+    parser.add_argument("--source-ip", dest="source_ip", help="来源 IP 过滤。")
+    _add_pagination_arguments(parser)
+    if include_keyword:
+        parser.add_argument("--keyword", help="关键字过滤，适用于命令/内容类查询。")
+    if include_direction:
+        parser.add_argument("--direction", help="传输方向，例如 `upload` 或 `download`。")
+    if include_storage:
+        parser.add_argument("--command-storage-id", dest="command_storage_id", help="指定 command storage ID。")
+        parser.add_argument(
+            "--command-storage-scope",
+            dest="command_storage_scope",
+            choices=["all"],
+            help="设为 `all` 时汇总全部可访问 command storage。",
+        )
+    if include_top:
+        parser.add_argument("--top", type=int, help="排行场景返回前 N 条。")
+
+
 def _permission_list(args: argparse.Namespace):
     context = ensure_selected_org_context()
     client = create_client()
-    filters = parse_json_arg(args.filters)
+    filters = merge_filter_args(
+        args,
+        explicit_fields=("name", "search", "limit", "offset", "user", "users", "is_expired"),
+        usage_examples=PERMISSION_LIST_EXAMPLES,
+    )
     path = _permission_resource_path(args.resource)
     records = client.list_paginated(path, params=filters)
     filtered_records = [item for item in records if isinstance(item, dict)] if isinstance(records, list) else records
@@ -454,7 +540,7 @@ def _asset_perm_users(args: argparse.Namespace):
     context = ensure_selected_org_context()
     client = create_client()
     discovery = create_discovery()
-    filters = parse_json_arg(args.filters)
+    filters = merge_filter_args(args, explicit_fields=("limit", "offset", "search"), usage_examples=ASSET_PERM_USERS_EXAMPLES)
     records = client.list_paginated("/api/v1/assets/assets/%s/perm-users/" % args.asset_id, params=filters)
     result = {
         "resource": "asset-perm-users",
@@ -489,11 +575,42 @@ def _asset_perm_users(args: argparse.Namespace):
 def _audit_list(args: argparse.Namespace):
     context = ensure_selected_org_context()
     client = create_client()
-    filters = _normalize_time_filters(parse_json_arg(args.filters), default_days=7)
+    filters = _normalize_time_filters(
+        merge_filter_args(
+            args,
+            explicit_fields=(
+                "date_from",
+                "date_to",
+                "days",
+                "user",
+                "user_id",
+                "asset",
+                "status",
+                "protocol",
+                "account",
+                "source_ip",
+                "keyword",
+                "limit",
+                "offset",
+            ),
+            usage_examples=AUDIT_LIST_EXAMPLES,
+        ),
+        default_days=7,
+    )
     filter_strategy = "server"
     if args.audit_type == "terminal-session":
         result, meta = _fetch_terminal_session_records(filters)
         filter_strategy = meta.get("filter_strategy") or filter_strategy
+    elif args.audit_type == "command":
+        result = _fetch_command_records(filters)
+        filter_strategy = "server+command_storage_context"
+    elif args.audit_type == "operate":
+        result = client.list_paginated(AUDIT_PATHS[args.audit_type], params=_operate_audit_server_filters(filters))
+        if isinstance(result, list):
+            filtered = _apply_common_filters([item for item in result if isinstance(item, dict)], filters)
+            if len(filtered) != len(result):
+                filter_strategy = "server+local_common_filters"
+            result = filtered
     else:
         result = client.list_paginated(AUDIT_PATHS[args.audit_type], params=_server_filters(filters))
         if isinstance(result, list):
@@ -513,13 +630,37 @@ def _audit_list(args: argparse.Namespace):
 def _audit_get(args: argparse.Namespace):
     context = ensure_selected_org_context()
     client = create_client()
-    result = client.get("%s%s/" % (AUDIT_PATHS[args.audit_type], args.id))
+    if args.audit_type == "command":
+        result = _fetch_command_record_by_id(args.id)
+    else:
+        result = client.get("%s%s/" % (AUDIT_PATHS[args.audit_type], args.id))
     return {"audit_type": args.audit_type, "record": result, **org_context_output(context)}
 
 
 def _terminal_sessions(args: argparse.Namespace):
     context = ensure_selected_org_context()
-    filters = _normalize_time_filters(parse_json_arg(args.filters), default_days=7)
+    filters = _normalize_time_filters(
+        merge_filter_args(
+            args,
+            explicit_fields=(
+                "date_from",
+                "date_to",
+                "days",
+                "user",
+                "user_id",
+                "asset",
+                "status",
+                "protocol",
+                "account",
+                "source_ip",
+                "keyword",
+                "limit",
+                "offset",
+            ),
+            usage_examples=TERMINAL_SESSION_EXAMPLES,
+        ),
+        default_days=7,
+    )
     preset = TERMINAL_SESSION_PRESETS.get(args.view or "")
     if preset:
         for key, value in preset.items():
@@ -549,7 +690,11 @@ def _terminal_sessions(args: argparse.Namespace):
 
 def _command_storage_hint(args: argparse.Namespace):
     context = ensure_selected_org_context()
-    filters = parse_json_arg(args.filters)
+    filters = merge_filter_args(
+        args,
+        explicit_fields=("command_storage_id", "command_storage_scope"),
+        usage_examples=COMMAND_STORAGE_HINT_EXAMPLES,
+    )
     return _command_storage_hint_payload(filters, context=context)
 
 
@@ -576,7 +721,32 @@ def _attach_filter_diagnostics(result: dict, filters: dict) -> dict:
 
 def _audit_analyze(args: argparse.Namespace):
     context = ensure_selected_org_context()
-    filters = _normalize_user_filter_payload(parse_json_arg(args.filters))
+    filters = _normalize_user_filter_payload(
+        merge_filter_args(
+            args,
+            explicit_fields=(
+                "date_from",
+                "date_to",
+                "days",
+                "user",
+                "user_id",
+                "asset",
+                "asset_keywords",
+                "keyword",
+                "direction",
+                "status",
+                "protocol",
+                "account",
+                "source_ip",
+                "command_storage_id",
+                "command_storage_scope",
+                "limit",
+                "offset",
+                "top",
+            ),
+            usage_examples=AUDIT_ANALYZE_EXAMPLES,
+        )
+    )
     effective_filters = dict(filters)
     storage_context = None
     if args.capability in COMMAND_AUDIT_CAPABILITIES:
@@ -620,7 +790,16 @@ def _audit_capabilities(_: argparse.Namespace):
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="JumpServer unified read-only query entry point.")
+    parser = argparse.ArgumentParser(
+        description="JumpServer 统一只读查询入口。",
+        epilog=(
+            "推荐路径:\n"
+            "  1. 优先使用显式参数，例如 --name、--days、--user、--limit\n"
+            "  2. 高级补充筛选使用重复的 --filter key=value\n"
+            "  3. 只有兼容旧命令时再使用 --filters '{\"key\": \"value\"}'"
+        ),
+        formatter_class=CLIHelpFormatter,
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     object_resources = [
@@ -637,58 +816,145 @@ def build_parser() -> argparse.ArgumentParser:
     ]
     permission_resources = sorted(PERMISSION_RESOURCE_PATHS)
 
-    object_list = subparsers.add_parser("object-list")
+    object_list = subparsers.add_parser(
+        "object-list",
+        help="按资源类型列出对象。",
+        description="列出资产、节点、平台、账号、用户、组织等对象。",
+        epilog="Examples:\n  " + "\n  ".join(OBJECT_LIST_EXAMPLES),
+        formatter_class=CLIHelpFormatter,
+    )
     object_list.add_argument("--resource", required=True, choices=object_resources)
-    object_list.add_argument("--kind")
-    object_list.add_argument("--filters")
+    object_list.add_argument("--kind", help="仅当 --resource asset 时可选，用于限定资产子类型。")
+    object_list.add_argument("--name", help="按名称精确优先匹配。")
+    object_list.add_argument("--search", help="服务端搜索关键字。")
+    _add_pagination_arguments(object_list)
+    add_filter_arguments(object_list)
     object_list.set_defaults(func=_object_list)
 
-    object_get = subparsers.add_parser("object-get")
+    object_get = subparsers.add_parser(
+        "object-get",
+        help="按 ID 读取单个对象详情。",
+        description="按资源类型和 ID 读取单个对象详情。",
+        formatter_class=CLIHelpFormatter,
+    )
     object_get.add_argument("--resource", required=True, choices=object_resources)
     object_get.add_argument("--id", required=True)
     object_get.set_defaults(func=_object_get)
 
-    permission_list = subparsers.add_parser("permission-list")
+    permission_list = subparsers.add_parser(
+        "permission-list",
+        help="列出权限、ACL 或 RBAC 记录。",
+        description="读取 asset-permission、ACL、RBAC 等权限相关资源。",
+        epilog="Examples:\n  " + "\n  ".join(PERMISSION_LIST_EXAMPLES),
+        formatter_class=CLIHelpFormatter,
+    )
     permission_list.add_argument("--resource", choices=permission_resources, default="asset-permission")
-    permission_list.add_argument("--filters")
+    permission_list.add_argument("--name", help="按权限名称精确优先匹配。")
+    permission_list.add_argument("--search", help="服务端搜索关键字。")
+    permission_list.add_argument("--user", help="按用户名或显示名筛选 asset-permission。")
+    permission_list.add_argument("--users", help="兼容字段，按用户标识筛选 asset-permission。")
+    permission_list.add_argument("--is-expired", dest="is_expired", help="按过期状态筛选，例如 true / false。")
+    _add_pagination_arguments(permission_list)
+    add_filter_arguments(permission_list)
     permission_list.set_defaults(func=_permission_list)
 
-    permission_get = subparsers.add_parser("permission-get")
+    permission_get = subparsers.add_parser(
+        "permission-get",
+        help="按 ID 读取单条权限记录详情。",
+        description="按资源类型和 ID 读取权限、ACL 或 RBAC 详情。",
+        formatter_class=CLIHelpFormatter,
+    )
     permission_get.add_argument("--resource", choices=permission_resources, default="asset-permission")
     permission_get.add_argument("--id")
     permission_get.add_argument("--permission-id")
     permission_get.set_defaults(func=_permission_get)
 
-    asset_perm_users = subparsers.add_parser("asset-perm-users")
+    asset_perm_users = subparsers.add_parser(
+        "asset-perm-users",
+        help="查看某资产的授权主体列表。",
+        description="读取资产授权用户视图；当服务端视图为空时，会补充权限解释摘要。",
+        epilog="Examples:\n  " + "\n  ".join(ASSET_PERM_USERS_EXAMPLES),
+        formatter_class=CLIHelpFormatter,
+    )
     asset_perm_users.add_argument("--asset-id", required=True)
-    asset_perm_users.add_argument("--filters")
+    _add_pagination_arguments(asset_perm_users)
+    add_filter_arguments(asset_perm_users)
     asset_perm_users.set_defaults(func=_asset_perm_users)
 
-    audit_list = subparsers.add_parser("audit-list")
+    audit_list = subparsers.add_parser(
+        "audit-list",
+        help="读取登录、会话、命令等审计明细。",
+        description="读取指定审计类型的明细记录；未给时间时默认最近 7 天。",
+        epilog="Examples:\n  " + "\n  ".join(AUDIT_LIST_EXAMPLES),
+        formatter_class=CLIHelpFormatter,
+    )
     audit_list.add_argument("--audit-type", required=True, choices=sorted(AUDIT_PATHS))
-    audit_list.add_argument("--filters")
+    _add_common_audit_filter_arguments(audit_list, include_keyword=True)
+    add_filter_arguments(audit_list)
     audit_list.set_defaults(func=_audit_list)
 
-    audit_get = subparsers.add_parser("audit-get")
+    audit_get = subparsers.add_parser(
+        "audit-get",
+        help="按 ID 读取单条审计详情。",
+        description=(
+            "按审计类型和记录 ID 读取单条详情。"
+            "当 audit-type=command 时，--id 必须使用 CLI 返回的稳定命令记录 ID。"
+        ),
+        formatter_class=CLIHelpFormatter,
+    )
     audit_get.add_argument("--audit-type", required=True, choices=sorted(AUDIT_PATHS))
-    audit_get.add_argument("--id", required=True)
+    audit_get.add_argument("--id", required=True, help="记录 ID；command 审计必须传入 CLI 返回的稳定 ID。")
     audit_get.set_defaults(func=_audit_get)
 
-    terminal_sessions = subparsers.add_parser("terminal-sessions")
+    terminal_sessions = subparsers.add_parser(
+        "terminal-sessions",
+        help="读取 terminal 在线或历史会话。",
+        description="查询 terminal 组件的在线或历史会话，支持资产、本地时间窗和用户过滤。",
+        epilog="Examples:\n  " + "\n  ".join(TERMINAL_SESSION_EXAMPLES),
+        formatter_class=CLIHelpFormatter,
+    )
     terminal_sessions.add_argument("--view", choices=["online", "history"])
-    terminal_sessions.add_argument("--filters")
+    _add_common_audit_filter_arguments(terminal_sessions, include_keyword=True)
+    add_filter_arguments(terminal_sessions)
     terminal_sessions.set_defaults(func=_terminal_sessions)
 
-    command_storage_hint = subparsers.add_parser("command-storage-hint")
-    command_storage_hint.add_argument("--filters")
+    command_storage_hint = subparsers.add_parser(
+        "command-storage-hint",
+        help="查看 command storage 选择上下文。",
+        description="用于命令审计前确认默认 storage、可切换 storage 和是否需要显式指定。",
+        epilog="Examples:\n  " + "\n  ".join(COMMAND_STORAGE_HINT_EXAMPLES),
+        formatter_class=CLIHelpFormatter,
+    )
+    command_storage_hint.add_argument("--command-storage-id", dest="command_storage_id")
+    command_storage_hint.add_argument("--command-storage-scope", dest="command_storage_scope", choices=["all"])
+    add_filter_arguments(command_storage_hint)
     command_storage_hint.set_defaults(func=_command_storage_hint)
 
-    audit_analyze = subparsers.add_parser("audit-analyze")
+    audit_analyze = subparsers.add_parser(
+        "audit-analyze",
+        help="执行 capability 化的审计分析。",
+        description="用于会话、命令、传输和异常行为等 capability 化分析。",
+        epilog="Examples:\n  " + "\n  ".join(AUDIT_ANALYZE_EXAMPLES),
+        formatter_class=CLIHelpFormatter,
+    )
     audit_analyze.add_argument("--capability", required=True)
-    audit_analyze.add_argument("--filters")
+    _add_common_audit_filter_arguments(
+        audit_analyze,
+        include_direction=True,
+        include_keyword=True,
+        include_storage=True,
+        include_top=True,
+    )
+    audit_analyze.add_argument("--asset-keywords", dest="asset_keywords", help="敏感资产审计使用的资产关键字。")
+    add_filter_arguments(audit_analyze)
     audit_analyze.set_defaults(func=_audit_analyze)
 
-    audit_capabilities = subparsers.add_parser("capabilities")
+    audit_capabilities = subparsers.add_parser(
+        "capabilities",
+        help="列出可用的 audit-analyze capability。",
+        description="输出所有由 jms_query.py audit-analyze 支持的 capability。",
+        formatter_class=CLIHelpFormatter,
+    )
     audit_capabilities.set_defaults(func=_audit_capabilities)
     return parser
 

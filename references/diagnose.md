@@ -8,6 +8,7 @@
 - `select-org` 是显式组织选择入口；未选组织时，除 `config-status`、`config-write`、`ping`、`select-org` 外，其余子命令都会先阻塞。
 - 当当前组织已生效时，`ping`、`select-org` 以及主要查询结果会额外回显仍可切换的组织列表，便于继续按其他组织范围查询。
 - 统计与巡检类聚合请求优先用 `inspect --capability ...`；需要直连读取某类设置或系统对象时，再用专用子命令。
+- 推荐优先使用显式参数：`--org-name`、`--days`、`--date-from`、`--date-to`、`--name`、`--limit`；需要补充高级字段时再用重复的 `--filter key=value`；`--filters` 仅兼容旧命令。
 
 ## 子命令与适用场景
 
@@ -16,7 +17,7 @@
 | `config-status` | 查看本地运行时配置是否完整 | 无 | `complete`、认证方式、`missing_fields`、`invalid_fields` |
 | `config-write` | 把对话收集到的运行时配置写入 `.env` | `--payload` + `--confirm` | 脱敏后的当前配置摘要 |
 | `ping` | 验证环境与 API client 连通性 | 无 | 是否可连接、当前用户、当前组织、可切换组织 |
-| `select-org` | 查看当前环境组织或显式写入 `JMS_ORG_ID` | 可选 `--org-id` | `candidate_orgs`、`effective_org`、可切换组织 |
+| `select-org` | 查看当前环境组织或显式写入 `JMS_ORG_ID` | 可选 `--org-id` / `--org-name` | `candidate_orgs`、`effective_org`、可切换组织 |
 | `resolve` | 把自然语言名称解析成对象 | `--resource` + `--name` 或 `--id` | 规范对象 |
 | `resolve-platform` | 解析资产筛选或平台识别里的 `platform` 值 | `--value` | `status`、`resolved`、候选平台列表 |
 | `user-assets` | 查用户当前可访问资产 | `--user-id` 或 `--username` | 有效资产列表 |
@@ -26,10 +27,10 @@
 | `recent-audit` | 快速看最近审计 | `--audit-type` | 最近事件列表，包含 `data_source` / `filter_strategy` / `asset_evidence` |
 | `settings-category` | 按设置分类读取系统配置 | `--category` | 原始设置项与分类摘要 |
 | `license-detail` | 查看许可证详情 | 无 | 许可证原始详情 |
-| `tickets` | 查看工单列表 | 可选 `--filters` | 工单记录 |
-| `command-storages` | 查看命令存储列表 | 可选 `--filters` | 命令存储记录 |
-| `replay-storages` | 查看录像存储列表 | 可选 `--filters` | 录像存储记录 |
-| `terminals` | 查看终端组件列表 | 可选 `--filters` | 终端组件记录 |
+| `tickets` | 查看工单列表 | 可选 `--name` / `--search` / `--limit` | 工单记录 |
+| `command-storages` | 查看命令存储列表 | 可选 `--name` / `--search` / `--limit` | 命令存储记录 |
+| `replay-storages` | 查看录像存储列表 | 可选 `--name` / `--search` / `--limit` | 录像存储记录 |
+| `terminals` | 查看终端组件列表 | 可选 `--name` / `--search` / `--limit` | 终端组件记录 |
 | `reports` | 读取报表与 dashboard | `--report-type` | 报表原始返回与摘要 |
 | `account-automations` | 汇总账号备份、改密、风险、检测任务 | 可选 `--filters` | 自动化概览 |
 | `endpoint-inventory` | 查看核心端点在当前环境的 inventory / OPTIONS 缓存 | 可选 `--refresh` | 端点清单与方法能力 |
@@ -45,6 +46,7 @@
 python3 scripts/jumpserver_api/jms_diagnose.py config-status --json
 python3 scripts/jumpserver_api/jms_diagnose.py ping
 python3 scripts/jumpserver_api/jms_diagnose.py select-org
+python3 scripts/jumpserver_api/jms_diagnose.py select-org --org-name Default
 ```
 
 对象解析：
@@ -99,10 +101,10 @@ python3 scripts/jumpserver_api/jms_diagnose.py asset-permission-explain --org-na
 ```bash
 python3 scripts/jumpserver_api/jms_diagnose.py settings-category --category security_auth
 python3 scripts/jumpserver_api/jms_diagnose.py license-detail
-python3 scripts/jumpserver_api/jms_diagnose.py tickets --filters '{"limit":10}'
-python3 scripts/jumpserver_api/jms_diagnose.py command-storages
-python3 scripts/jumpserver_api/jms_diagnose.py replay-storages
-python3 scripts/jumpserver_api/jms_diagnose.py terminals
+python3 scripts/jumpserver_api/jms_diagnose.py tickets --limit 10
+python3 scripts/jumpserver_api/jms_diagnose.py command-storages --limit 10
+python3 scripts/jumpserver_api/jms_diagnose.py replay-storages --limit 10
+python3 scripts/jumpserver_api/jms_diagnose.py terminals --limit 10
 ```
 
 `recent-audit` 补充说明：
@@ -117,10 +119,16 @@ python3 scripts/jumpserver_api/jms_diagnose.py terminals
 
 ```bash
 python3 scripts/jumpserver_api/jms_diagnose.py reports --report-type account-statistic --days 30
-python3 scripts/jumpserver_api/jms_diagnose.py account-automations
+python3 scripts/jumpserver_api/jms_diagnose.py account-automations --days 30 --limit 10
 python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability system-settings-overview
-python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability hot-assets-ranking --filters '{"days":30}'
+python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability hot-assets-ranking --days 30 --top 10 --limit 10
 python3 scripts/jumpserver_api/jms_diagnose.py endpoint-inventory --refresh
 python3 scripts/jumpserver_api/jms_diagnose.py endpoint-verify --path /api/v1/settings/setting/ --method GET
 python3 scripts/jumpserver_api/jms_diagnose.py capabilities
+```
+
+兼容旧命令时，下面这种 JSON 写法仍然可用：
+
+```bash
+python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability hot-assets-ranking --filters '{"days":30}'
 ```

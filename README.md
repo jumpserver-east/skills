@@ -47,9 +47,35 @@ cp .env.example .env
 
 3. 直接用自然语言描述需求，不需要手动拼接脚本命令。例如“查某某用户在 Default 组织下有哪些资产”“看看昨天使用情况”“看某条授权规则详情”。
 
-4. 根据返回结果继续补充上下文。如果结果提示 `candidate_orgs`、`switchable_orgs`、候选对象或缺少时间范围，就按提示补充组织、对象名称、平台或时间窗口。组织必须先选时，返回里还会带 `reason_code`、`user_message`、`action_hint` 和 `candidate_org_count`，方便直接按提示继续。
+4. 根据返回结果继续补充上下文。如果结果提示 `candidate_orgs`、`switchable_orgs`、候选对象或缺少时间范围，就按提示补充组织、对象名称、平台或时间窗口。组织必须先选时，返回里还会带 `reason_code`、`user_message`、`action_hint`、`suggested_commands` 和 `candidate_org_count`，方便直接按提示继续。
 
 使用时不需要记住具体执行命令。这个 skill 会先做预检，再按路由规则自动选择正式入口，并在需要时提示你补充组织、对象或时间范围。
+
+## 手工 CLI 路径
+
+如果你希望直接手动执行正式入口，推荐按下面的顺序使用参数：
+
+1. 优先使用显式参数，例如 `--org-name`、`--name`、`--days`、`--user`、`--limit`
+2. 需要补充少量高级字段时，再重复传入 `--filter key=value`
+3. 只有兼容旧命令时，才使用 `--filters '{"key":"value"}'`
+
+推荐写法：
+
+```bash
+python3 scripts/jumpserver_api/jms_diagnose.py select-org --org-name Default
+python3 scripts/jumpserver_api/jms_diagnose.py user-assets --org-name Default --username gusiqing
+python3 scripts/jumpserver_api/jms_query.py object-list --resource organization --name Default --limit 5
+python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability session-record-query --days 7 --user gusiqing --limit 20
+python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability hot-assets-ranking --days 30 --top 10 --limit 10
+python3 scripts/jumpserver_api/jms_diagnose.py reports --report-type account-statistic --days 30
+```
+
+兼容写法：
+
+```bash
+python3 scripts/jumpserver_api/jms_query.py object-list --resource organization --filters '{"name":"Default","limit":5}'
+python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability session-record-query --filter user=gusiqing --filter days=7 --filter limit=20
+```
 
 ## 环境变量
 
@@ -183,6 +209,7 @@ cp .env.example .env
 - `reason_code=organization_selection_required`
 - `user_message`：明确提示“继续前必须先选择一个组织”
 - `action_hint`：给出安全下一步命令模板
+- `suggested_commands`：给出 1 到 3 条可直接复制的后续命令
 - `candidate_org_count`：当前候选组织数量
 - `org_selection_policy=required_before_query_when_multiple_accessible_orgs`
 
