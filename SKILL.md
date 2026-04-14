@@ -1,6 +1,6 @@
 ---
 name: jumpserver-skills
-description: JumpServer V4.10 查询、诊断与使用分析 skill。Use when users ask to query objects, permissions, effective access, page-style audit logs, reports or dashboards, or generate a daily usage HTML report for a specific day or time range such as 使用报告、日报、某天使用情况、某段时间使用分析、daily usage report, usage analysis, or JumpServer usage overview.
+description: JumpServer V4.10 查询、诊断、使用分析、SSH 向导连接 skill。Use when users ask to query objects, permissions, effective access, page-style audit logs, reports or dashboards, generate a daily usage HTML report, or get SSH connection tokens for guided SSH connections. 使用报告、日报、某天使用情况、某段时间使用分析、daily usage report, usage analysis, JumpServer usage overview, SSH 向导连接、获取连接令牌.
 ---
 
 # JumpServer Skills
@@ -10,6 +10,7 @@ description: JumpServer V4.10 查询、诊断与使用分析 skill。Use when us
 - `python3 scripts/jumpserver_api/jms_query.py ...`
 - `python3 scripts/jumpserver_api/jms_diagnose.py ...`
 - `python3 scripts/jumpserver_api/jms_report.py ...`
+- `python3 scripts/jumpserver_api/jms_ssh_guide_cli.py ...`（仅用于 SSH 向导连接，开发/调试阶段）
 
 上面的 `scripts/jumpserver_api/...` 路径以当前工作目录是 skill 根目录为前提；如果调用方的 cwd 不在 skill 根目录，先切换到 skill 根目录，或改用仓库相对路径再执行。这属于执行上下文问题，不要表述成“仓库路径写错”或“正式入口路径错误”。
 
@@ -20,6 +21,7 @@ description: JumpServer V4.10 查询、诊断与使用分析 skill。Use when us
 优先使用当前显式参数；低频页面字段再用重复的 `--filter key=value`。
 
 ```bash
+# 查询和诊断
 python3 scripts/jumpserver_api/jms_diagnose.py select-org --org-name Default
 python3 scripts/jumpserver_api/jms_diagnose.py user-assets --org-name Default --username example.user
 python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type login --days 30 --username 示例用户(example.user)
@@ -28,6 +30,22 @@ python3 scripts/jumpserver_api/jms_diagnose.py tickets --applicant example.user 
 python3 scripts/jumpserver_api/jms_query.py job-list --name 删除Windows用户
 python3 scripts/jumpserver_api/jms_diagnose.py reports --report-type account-statistic --days 30
 python3 scripts/jumpserver_api/jms_report.py daily-usage --period 上周 --org-name Default
+
+# SSH 向导连接（获取临时令牌）- 支持资产名称和账号用户名自动解析！
+python3 scripts/jumpserver_api/jms_ssh_guide_cli.py get-credentials \
+  --asset server-prod-01 \
+  --account root
+
+python3 scripts/jumpserver_api/jms_ssh_guide_cli.py get-token \
+  --asset server-prod-01 \
+  --account root \
+  --protocol ssh \
+  --output json
+
+# 旧方式（使用 UUID）仍然支持
+python3 scripts/jumpserver_api/jms_ssh_guide_cli.py get-credentials \
+  --asset 2fcc289b-f985-4e51-bde9-65d63bf47cca \
+  --account fb13bca0-6136-4d83-9bc0-6de7087d99fd
 ```
 
 阻塞或参数错误时，优先看返回里的 `reason_code`、`user_message`、`action_hint`、`suggested_commands`，不要只看顶层 `error`。
@@ -37,7 +55,8 @@ python3 scripts/jumpserver_api/jms_report.py daily-usage --period 上周 --org-n
 ## Route First
 
 按下面顺序判路由。上面的规则优先于下面的规则。
-
+0. 如果用户要获取 SSH 向导连接令牌、获取连接用户名密码、生成临时连接令牌、连接到某某资产，或者问题涉及**连接令牌**、**导向连接**、**connection-token**，优先走 SSH 向导连接路径。
+动作：优先使用 Python API (`SSHGuideConnector`)或 CLI (`jms_ssh_guide_cli.py`)。支持**资产名称、IP 地址或 UUID**，以及**账号用户名、账号名称或 UUID**作为参数——无需手动查 UUID，系统自动查询解析。直接调用 `get-credentials` / `get-token` 即可，如果需要特定的资产和账号可以先用 `jms_diagnose.py user-assets` 了解可用资产。详见 [references/ssh-guide-connection.md](references/ssh-guide-connection.md)。
 1. 如果用户点名一个或多个具体用户，并问某时间窗内“登录多少次 / 登录次数 / 成功登录多少次 / 失败登录多少次”，优先走页面同款登录日志计数。
 动作：优先使用 `python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type login ...`；多个用户时按用户逐个查询，并直接用返回里的 `summary.total` 回答。回答时先交代时间范围、组织和统计口径，再逐个用户列出结果。不要走 `daily-usage`、`recent-active-users-ranking` 或 Top 榜单，也不要写“从这次已返回记录看”“我逐条数出来的”这类样本口吻。
 
