@@ -13,6 +13,7 @@ ensure_requirements_installed()
 
 import argparse
 
+from jumpserver_api.jms_scheduler_dispatch import run_scheduled_report
 from jumpserver_api.jms_reporting import build_daily_usage_report, validate_report_contract
 from jumpserver_api.jms_runtime import CLIHelpFormatter, print_json, run_and_print
 
@@ -21,6 +22,11 @@ DAILY_USAGE_EXAMPLES = [
     "python3 scripts/jumpserver_api/jms_report.py daily-usage --date 20260310",
     "python3 scripts/jumpserver_api/jms_report.py daily-usage --period 上周 --org-name Default",
     "python3 scripts/jumpserver_api/jms_report.py daily-usage --date-from '2026-03-10 00:00:00' --date-to '2026-03-24 23:59:59' --org-id 00000000-0000-0000-0000-000000000000",
+]
+
+SCHEDULE_REPORT_EXAMPLES = [
+    "python3 scripts/jumpserver_api/jms_report.py schedule-report --schedule-for daily --org-name Default",
+    "python3 scripts/jumpserver_api/jms_report.py schedule-report --schedule-for weekly --org-name Default --webhook-url https://example.com/webhook",
 ]
 
 
@@ -39,6 +45,20 @@ def _daily_usage(args: argparse.Namespace):
 
 def _contract_check(_: argparse.Namespace):
     return validate_report_contract()
+
+
+def _schedule_report(args: argparse.Namespace):
+    return run_scheduled_report(
+        schedule_for=args.schedule_for,
+        org_id=args.org_id,
+        org_name=args.org_name,
+        org_list=args.org_list,
+        webhook_url=args.webhook_url,
+        command_storage_id=args.command_storage_id,
+        retry_count=int(args.retry_count or 0),
+        retry_delay_seconds=float(args.retry_delay_seconds or 0),
+        dry_run=bool(args.dry_run),
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -78,6 +98,24 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=CLIHelpFormatter,
     )
     contract_check.set_defaults(func=_contract_check)
+
+    schedule_report = subparsers.add_parser(
+        "schedule-report",
+        help="按调度语义生成日报/周报/月报并可推送 webhook。",
+        description="调度入口：daily=昨天日报，weekly=上周周报，monthly=本月报告。",
+        epilog="Examples:\n  " + "\n  ".join(SCHEDULE_REPORT_EXAMPLES),
+        formatter_class=CLIHelpFormatter,
+    )
+    schedule_report.add_argument("--schedule-for", choices=["daily", "weekly", "monthly"], required=True, help="调度周期类型。")
+    schedule_report.add_argument("--org-id", help="组织 ID。")
+    schedule_report.add_argument("--org-name", help="组织名称。")
+    schedule_report.add_argument("--org-list", help="批量组织列表，逗号分隔；可混合 org-id 与 org-name。")
+    schedule_report.add_argument("--command-storage-id", help="显式指定单个 command storage。")
+    schedule_report.add_argument("--retry-count", type=int, default=1, help="失败重试次数。")
+    schedule_report.add_argument("--retry-delay-seconds", type=float, default=1.0, help="重试间隔秒数。")
+    schedule_report.add_argument("--dry-run", action="store_true", help="仅展示调度计划，不执行报告生成。")
+    schedule_report.add_argument("--webhook-url", help="通用 HTTP webhook URL。")
+    schedule_report.set_defaults(func=_schedule_report)
     return parser
 
 

@@ -43,6 +43,7 @@ from .jms_analytics import (
     resolve_command_storage_context,
     suspicious_operation_summary,
 )
+from .jms_risk_sessions import analyze_risky_sessions
 from .jms_runtime import (
     CLIError,
     GLOBAL_ORG_ID,
@@ -677,6 +678,78 @@ def _render_command_risk_rows(rows: list[dict[str, Any]]) -> str:
     )
 
 
+def _render_risk_session_rows(rows: list[dict[str, Any]]) -> str:
+    if not rows:
+        return _empty_row(7)
+
+    def _highlight_terms(text: str, terms: list[str]) -> str:
+        raw = str(text or "")
+        valid_terms = [str(term).strip() for term in terms if str(term or "").strip()]
+        if not raw or not valid_terms:
+            return escape(raw or EMPTY_TEXT)
+        # Prefer longer terms first to avoid nested highlights.
+        ordered = sorted(set(valid_terms), key=len, reverse=True)
+        pattern = re.compile("|".join(re.escape(term) for term in ordered), re.IGNORECASE)
+        chunks: list[str] = []
+        cursor = 0
+        for match in pattern.finditer(raw):
+            start, end = match.span()
+            if start > cursor:
+                chunks.append(escape(raw[cursor:start]))
+            chunks.append("<mark>%s</mark>" % escape(raw[start:end]))
+            cursor = end
+        if cursor < len(raw):
+            chunks.append(escape(raw[cursor:]))
+        return "".join(chunks)
+
+    rendered_rows: list[str] = []
+    for index, item in enumerate(rows[:10], start=1):
+        session_id_text = escape(_string_value(_first_field(item, "session_id", "session")) or EMPTY_TEXT)
+        user = escape(_string_value(_first_field(item, "user")) or EMPTY_TEXT)
+        asset = escape(_string_value(_first_field(item, "asset")) or EMPTY_TEXT)
+        risk_score = escape(_string_value(_first_field(item, "risk_score")) or "0")
+        risk_level = escape(_string_value(_first_field(item, "risk_level")) or EMPTY_TEXT)
+        risk_factors = escape(_string_value(_first_field(item, "risk_factors")) or EMPTY_TEXT)
+        analysis = escape(_string_value(_first_field(item, "analysis", "command_chain")) or EMPTY_TEXT)
+        contexts = item.get("matched_contexts") if isinstance(item.get("matched_contexts"), list) else []
+        context_items: list[str] = []
+        for ctx_index, context in enumerate(contexts[:6], start=1):
+            if not isinstance(context, dict):
+                continue
+            types = context.get("risk_types") if isinstance(context.get("risk_types"), list) else []
+            types_text = ", ".join([str(v) for v in types if str(v or "").strip()]) or "unknown"
+            command_text = str(context.get("command") or "").strip() or "(empty)"
+            matched_terms = context.get("matched_terms") if isinstance(context.get("matched_terms"), list) else []
+            context_items.append(
+                "<li><strong>#%s</strong> 命中类型: <code>%s</code><br/><span class=\"mono\">%s</span></li>"
+                % (ctx_index, escape(types_text), _highlight_terms(command_text, matched_terms))
+            )
+        if not context_items:
+            context_items.append("<li>暂无可展示的命令上下文。</li>")
+        detail_row_id = "risk-session-detail-%s" % index
+        session_cell_html = (
+            "<button type=\"button\" class=\"risk-expand-toggle\" data-target=\"%s\" aria-expanded=\"false\" title=\"展开命中命令\">"
+            "<span class=\"expand-icon\" aria-hidden=\"true\"></span>"
+            "</button>"
+            "<span class=\"session-id-text\">%s</span>"
+            % (detail_row_id, session_id_text)
+        )
+        rendered_rows.append(
+            "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>"
+            % (session_cell_html, user, asset, risk_score, risk_level, risk_factors, analysis)
+        )
+        rendered_rows.append(
+            "<tr id=\"%s\" class=\"risk-session-detail-row\" style=\"display:none;\"><td colspan=\"7\">"
+            "<div class=\"risk-session-detail-panel\">"
+            "<div class=\"risk-session-detail-title\">会话命中命令明细</div>"
+            "<ul>%s</ul>"
+            "</div>"
+            "</td></tr>"
+            % (detail_row_id, "".join(context_items))
+        )
+    return "".join(rendered_rows)
+
+
 def _normalize_direction(value: str) -> str:
     text = str(value or "").strip().lower()
     if any(token in text for token in ("upload", "up", "上传")):
@@ -854,6 +927,19 @@ def _normalize_suspicious_source(filters: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _normalize_risk_session_source(filters: dict[str, Any], command_storage_id: str | None) -> dict[str, Any]:
+    command_source = _normalize_command_source(filters, command_storage_id)
+    analysis = analyze_risky_sessions(command_source.get("records") or [])
+    records = list(analysis.get("risk_sessions") or [])
+    return {
+        "risk_session_total": int(analysis.get("risk_session_total") or 0),
+        "risk_session_summary": analysis.get("risk_session_summary") or EMPTY_TEXT,
+        "risk_scoring_notes": analysis.get("risk_scoring_notes") or EMPTY_TEXT,
+        "risk_session_rows": _render_risk_session_rows(records),
+        "records": records,
+    }
+
+
 def _source_key(source: dict[str, Any]) -> str:
     capability_id = str(source.get("capability_id") or "").strip()
     if capability_id:
@@ -913,6 +999,8 @@ def _collect_source_payloads(
             }
         elif source_key == "capability:suspicious-operation-summary":
             payload = _normalize_suspicious_source(filters)
+        elif source_key == "capability:risky-session-context-analysis":
+            payload = _normalize_risk_session_source(filters, command_storage_id)
         elif source_key == "capability:failed-login-statistics":
             login_payload = fetch("entrypoint:python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type login")
             payload = {
@@ -956,6 +1044,7 @@ def _derive_fields(
 ) -> dict[str, Any]:
     command_payload = source_payloads.get("capability:command-record-query", {})
     high_risk_payload = source_payloads.get("capability:high-risk-command-audit", {})
+    risk_session_payload = source_payloads.get("capability:risky-session-context-analysis", {})
     risk_level = _risk_level_label(
         int(resolved.get("risk_event_total") or 0),
         int(resolved.get("login_failed") or 0),
@@ -987,6 +1076,22 @@ def _derive_fields(
             "若高危命令占比持续升高，应优先复核高危命令明细、确认执行账号与资产范围，并结合操作目的评估是否需要收紧规范。"
             if int(resolved.get("high_risk_command_total") or 0) > 0
             else "本时段未发现高危命令集中爆发迹象，命令执行整体较为平稳。"
+        ),
+        "user_usage_frequency_summary": (
+            "用户使用频率统计：%s。"
+            % (resolved.get("top_active_users") or resolved.get("top_command_users") or EMPTY_TEXT)
+        ),
+        "asset_usage_frequency_summary": (
+            "资产使用频率统计：%s。"
+            % (resolved.get("top_active_assets") or resolved.get("top_command_assets") or EMPTY_TEXT)
+        ),
+        "risk_session_analysis": (
+            str(risk_session_payload.get("risk_session_summary") or "").strip()
+            or "未识别到高置信度风险会话。"
+        ),
+        "risk_session_scoring_notes": (
+            str(risk_session_payload.get("risk_scoring_notes") or "").strip()
+            or "评分说明不可用。"
         ),
         "risk_level": risk_level,
         "risk_summary": (

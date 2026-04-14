@@ -273,6 +273,74 @@
       letter-spacing: -0.04em;
     }
 
+    .data-table details {
+      cursor: pointer;
+    }
+
+    .risk-expand-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      margin-right: 6px;
+      border: 1px solid rgba(28, 140, 121, 0.35);
+      border-radius: 6px;
+      background: #ffffff;
+      cursor: pointer;
+      vertical-align: middle;
+      padding: 0;
+    }
+
+    .risk-expand-toggle .expand-icon {
+      width: 8px;
+      height: 8px;
+      border-right: 2px solid var(--jms-primary-deep);
+      border-bottom: 2px solid var(--jms-primary-deep);
+      transform: rotate(45deg);
+      transition: transform 0.2s ease;
+    }
+
+    .risk-expand-toggle[aria-expanded="true"] .expand-icon {
+      transform: rotate(225deg);
+    }
+
+    .session-id-text {
+      vertical-align: middle;
+      font-weight: 700;
+      color: var(--jms-primary-deep);
+      white-space: nowrap;
+      word-break: normal;
+      overflow-wrap: normal;
+    }
+
+    .risk-session-detail-row td {
+      background: rgba(231, 244, 240, 0.7);
+      border-top: 0;
+    }
+
+    .risk-session-detail-panel {
+      padding: 6px 2px;
+    }
+
+    .risk-session-detail-title {
+      font-weight: 700;
+      color: var(--jms-ink);
+      margin-bottom: 4px;
+    }
+
+    .data-table details ul {
+      margin: 8px 0 0 18px;
+      padding: 0;
+    }
+
+    .data-table mark {
+      background: rgba(216, 91, 99, 0.2);
+      color: #8b1f2a;
+      border-radius: 4px;
+      padding: 0 3px;
+      font-weight: 700;
+    }
     .metric-card .detail {
       display: block;
       margin-top: 10px;
@@ -567,9 +635,17 @@
       gap: 16px;
     }
 
+    .two-column > * {
+      min-width: 0;
+    }
+
     .section-stack {
       display: grid;
       gap: 16px;
+    }
+
+    .section-stack > * {
+      min-width: 0;
     }
 
     .summary-table-grid {
@@ -776,6 +852,63 @@
     .data-table-command tbody td:nth-child(6),
     .data-table-command tbody td:nth-child(7) {
       white-space: nowrap;
+    }
+
+    .data-table-risk-session {
+      min-width: 1620px;
+      table-layout: fixed;
+    }
+
+    .data-table-risk-session thead th:nth-child(1),
+    .data-table-risk-session tbody td:nth-child(1) {
+      width: 430px;
+      white-space: nowrap;
+      word-break: normal;
+      overflow-wrap: normal;
+    }
+
+    .data-table-risk-session thead th:nth-child(2),
+    .data-table-risk-session tbody td:nth-child(2) {
+      width: 200px;
+      white-space: nowrap;
+      word-break: normal;
+      overflow-wrap: normal;
+    }
+
+    .data-table-risk-session thead th:nth-child(3),
+    .data-table-risk-session tbody td:nth-child(3) {
+      width: 220px;
+      white-space: nowrap;
+      word-break: normal;
+      overflow-wrap: normal;
+    }
+
+    .data-table-risk-session thead th:nth-child(4),
+    .data-table-risk-session tbody td:nth-child(4) {
+      width: 90px;
+      white-space: nowrap;
+    }
+
+    .data-table-risk-session thead th:nth-child(5),
+    .data-table-risk-session tbody td:nth-child(5) {
+      width: 110px;
+      white-space: nowrap;
+    }
+
+    .data-table-risk-session thead th:nth-child(6),
+    .data-table-risk-session tbody td:nth-child(6) {
+      width: 250px;
+      white-space: normal;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+
+    .data-table-risk-session thead th:nth-child(7),
+    .data-table-risk-session tbody td:nth-child(7) {
+      width: auto;
+      white-space: normal !important;
+      word-break: break-word;
+      overflow-wrap: anywhere;
     }
 
     .data-table-login {
@@ -1266,6 +1399,22 @@
     .command-analysis-stack {
       display: grid;
       gap: 16px;
+    }
+
+    .command-analysis-stack > * {
+      min-width: 0;
+    }
+
+    .summary-card .body-text,
+    .compact-card .body-text,
+    .insight-body {
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .summary-list strong {
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
 
     .footer {
@@ -1914,6 +2063,18 @@
               </ul>
             </article>
 
+            <div class="two-column">
+              <article class="compact-card">
+                <h3>用户使用频率统计</h3>
+                <p class="body-text">{{user_usage_frequency_summary}}</p>
+              </article>
+
+              <article class="compact-card">
+                <h3>资产使用频率统计</h3>
+                <p class="body-text">{{asset_usage_frequency_summary}}</p>
+              </article>
+            </div>
+
             <article class="table-card">
               <h3>高危命令执行明细</h3>
               <div class="table-shell">
@@ -1951,6 +2112,30 @@
                 <p class="insight-body">{{command_compliance_analysis}}</p>
               </article>
             </div>
+
+            <article class="table-card">
+              <h3>AI 命令上下文关联风险会话（{{risk_session_total}}）</h3>
+              <div class="table-shell">
+                <table class="data-table data-table-risk-session">
+                  <thead>
+                    <tr>
+                      <th>会话 ID</th>
+                      <th>用户</th>
+                      <th>资产</th>
+                      <th>风险分</th>
+                      <th>风险等级</th>
+                      <th>风险因子</th>
+                      <th>分析结论</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {{risk_session_rows}}
+                  </tbody>
+                </table>
+              </div>
+              <p class="body-text">{{risk_session_analysis}}</p>
+              <p class="body-text">评分方法：{{risk_session_scoring_notes}}</p>
+            </article>
           </div>
         </div>
       </section>
@@ -2003,5 +2188,24 @@
       <div class="footer-date">{{current_date}}</div>
     </footer>
   </div>
+  <script>
+    document.addEventListener("click", function (event) {
+      var button = event.target.closest(".risk-expand-toggle");
+      if (!button) {
+        return;
+      }
+      var targetId = button.getAttribute("data-target");
+      if (!targetId) {
+        return;
+      }
+      var row = document.getElementById(targetId);
+      if (!row) {
+        return;
+      }
+      var expanded = button.getAttribute("aria-expanded") === "true";
+      button.setAttribute("aria-expanded", expanded ? "false" : "true");
+      row.style.display = expanded ? "none" : "table-row";
+    });
+  </script>
 </body>
 </html>

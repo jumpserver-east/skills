@@ -3,7 +3,7 @@
   "template_path": "template/bastion-daily-usage-template.html",
   "template_type": "html",
   "placeholder_pattern": "{{field}}",
-  "field_count": 46,
+  "field_count": 52,
   "fields": [
     {
       "field": "license_company",
@@ -680,6 +680,141 @@
         "top_command_assets"
       ],
       "description": "基于高危命令执行结果生成的运维规范判断文本"
+    },
+    {
+      "field": "user_usage_frequency_summary",
+      "section": "command",
+      "component": "user_usage_frequency",
+      "value_type": "multiline_text",
+      "render_contract": "text",
+      "required": true,
+      "source_kind": "derived",
+      "sources": [
+        {
+          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability recent-active-users-ranking",
+          "capability_id": "recent-active-users-ranking"
+        },
+        {
+          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability command-record-query",
+          "capability_id": "command-record-query"
+        }
+      ],
+      "depends_on_fields": [
+        "session_user_top10_rows",
+        "top_command_users"
+      ],
+      "description": "用户使用频率统计摘要文本"
+    },
+    {
+      "field": "asset_usage_frequency_summary",
+      "section": "command",
+      "component": "asset_usage_frequency",
+      "value_type": "multiline_text",
+      "render_contract": "text",
+      "required": true,
+      "source_kind": "derived",
+      "sources": [
+        {
+          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability recent-active-assets-ranking",
+          "capability_id": "recent-active-assets-ranking"
+        },
+        {
+          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability command-record-query",
+          "capability_id": "command-record-query"
+        }
+      ],
+      "depends_on_fields": [
+        "session_asset_top10_rows",
+        "top_command_assets"
+      ],
+      "description": "资产使用频率统计摘要文本"
+    },
+    {
+      "field": "risk_session_total",
+      "section": "command",
+      "component": "risk_session_overview",
+      "value_type": "number_string",
+      "render_contract": "text",
+      "required": true,
+      "source_kind": "capability",
+      "sources": [
+        {
+          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability risky-session-context-analysis",
+          "capability_id": "risky-session-context-analysis",
+          "output_field": "risk_session_total"
+        }
+      ],
+      "depends_on_fields": [],
+      "description": "基于命令上下文关联识别出的风险会话数量"
+    },
+    {
+      "field": "risk_session_rows",
+      "section": "command",
+      "component": "risk_session_table",
+      "value_type": "html_rows",
+      "render_contract": "tbody_rows",
+      "required": true,
+      "source_kind": "capability",
+      "sources": [
+        {
+          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability risky-session-context-analysis",
+          "capability_id": "risky-session-context-analysis",
+          "output_field": "risk_session_rows"
+        }
+      ],
+      "depends_on_fields": [
+        "risk_session_total"
+      ],
+      "table_columns": [
+        "会话 ID",
+        "用户",
+        "资产",
+        "风险分",
+        "风险等级",
+        "风险因子",
+        "分析结论"
+      ],
+      "description": "风险会话明细表格 tbody 行 HTML"
+    },
+    {
+      "field": "risk_session_analysis",
+      "section": "command",
+      "component": "risk_session_analysis",
+      "value_type": "multiline_text",
+      "render_contract": "text",
+      "required": true,
+      "source_kind": "derived",
+      "sources": [
+        {
+          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability risky-session-context-analysis",
+          "capability_id": "risky-session-context-analysis"
+        }
+      ],
+      "depends_on_fields": [
+        "risk_session_total",
+        "risk_session_rows"
+      ],
+      "description": "风险会话分析结论文本"
+    },
+    {
+      "field": "risk_session_scoring_notes",
+      "section": "command",
+      "component": "risk_session_scoring_notes",
+      "value_type": "multiline_text",
+      "render_contract": "text",
+      "required": true,
+      "source_kind": "derived",
+      "sources": [
+        {
+          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability risky-session-context-analysis",
+          "capability_id": "risky-session-context-analysis"
+        }
+      ],
+      "depends_on_fields": [
+        "risk_session_total",
+        "risk_session_rows"
+      ],
+      "description": "风险会话评分方法说明"
     },
     {
       "field": "risk_event_total",

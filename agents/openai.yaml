@@ -8,6 +8,8 @@ interface:
     如果用户点名一个或多个具体用户，并问某时间窗内“登录多少次 / 登录次数 / 成功登录多少次 / 失败登录多少次”，不要走 `daily-usage`、`recent-active-users-ranking` 或 Top 榜单；优先使用 `python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type login ...`。默认统计全部登录记录，只有用户明确要求成功/失败或给出页面 `status` 口径时，才分别传 `--status 1/0`。多个用户时逐个查询，并直接使用返回里的 `summary.total` 回答。解析结果时固定按 `ok -> result -> summary / records` 读取；不能对可见 `records` 人工计数，也不要写“从这次已返回记录看”“我逐条数出来的”这类样本口吻。若终端输出被截断或只看到部分 JSON 片段，不能据此估算总量。
     先判请求的核心对象是否为某一天或某一段时间内的 JumpServer 使用数据分析；这包括使用报告、日报、使用情况、使用分析、审计分析、某天发生了什么、分析 `20260310`、看某天登录/会话/命令情况、JumpServer 使用概览，以及“帮我分析下某天堡垒机器的使用情况”“帮我分析下某时间段的堡垒机器使用情况”“帮我分析下20260310的堡垒机使用情况”“帮我分析下3月10号的堡垒机器使用情况”“帮我分析下2026-03-10到2026-03-24的堡垒机使用情况”“帮我分析下上周的堡垒机使用情况”这类说法。
     如果是，必须优先使用 `python3 scripts/jumpserver_api/jms_report.py daily-usage ...`；由它加载 `template/bastion-daily-usage-template.html` 与 `references/metadata/daily_usage_report_template_fields.json`，并在输出前完成生成后自检。
+    需要定时任务或跨 agent 调度时，统一使用 `python3 scripts/jumpserver_api/jms_report.py schedule-report --schedule-for daily|weekly|monthly ...`。调度结果可选推送通用 HTTP webhook。
+    报告内容必须包含用户使用频率统计、资产使用频率统计，以及基于命令上下文关联提取的风险会话分析；AI 语义分析不可用时，降级为规则引擎结果但仍返回结构化风险会话。
     这类请求要先把“昨天 / 20260310 / 3月10号 / 上周 / 本月”等时间表达归一化为明确时间窗，再生成完整 HTML 报告；不要先输出自由文本摘要。摘要只能作为报告的简短补充。
     如果 `daily-usage` 成功返回，最终回答必须先明确说明“报告已生成”，再按顺序回显报告文件、文件大小、模板路径、字段元数据路径、报告日期/开始时间/结束时间、生效组织、可切换组织、已查询命令存储 ID/数量、校验摘要；必要时可在中文标签后补原字段名，如 `生效组织（effective_org）`、`校验摘要（validation_summary）`。不得后台已生成 HTML 却只对外给摘要。
     只有当用户明确说“不要生成报告，直接分析”“先简单说下”“只给我结论”“不用模板”时，才允许跳过模板直接给简短分析。即使跳过模板，只要问题里还有“近一个月 / 最近 30 天 / 上周 / 本月”这类相对时间词，也要先把它们固定成明确的 `date_from/date_to`，并在回答里回显最终时间窗；其中“近一个月”默认按 recent 30 days 解释，不按自然月处理，除非用户明确说“上个月”“3 月整月”。

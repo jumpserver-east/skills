@@ -68,6 +68,10 @@ python3 scripts/jumpserver_api/jms_query.py object-list --resource organization 
 python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability session-record-query --days 7 --user example.user
 python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability hot-assets-ranking --days 30 --top 10
 python3 scripts/jumpserver_api/jms_diagnose.py reports --report-type account-statistic --days 30
+python3 scripts/jumpserver_api/jms_report.py schedule-report --schedule-for daily --org-name Default
+python3 scripts/jumpserver_api/jms_report.py schedule-report --schedule-for weekly --org-name Default --webhook-url https://example.com/webhook
+python3 scripts/jumpserver_api/jms_report.py schedule-report --schedule-for weekly --org-list Default,Production --retry-count 2 --retry-delay-seconds 2
+python3 scripts/jumpserver_api/jms_report.py schedule-report --schedule-for weekly --org-list Default,Production --dry-run
 ```
 
 兼容写法：
@@ -103,6 +107,11 @@ python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability session-r
 | `JMS_ORG_ID` | 初始化时可选 | 业务执行前会通过组织选择流程或保留组织规则写入 |
 | `JMS_TIMEOUT` | 可选 | 请求超时秒数 |
 | `JMS_VERIFY_TLS` | 可选 | 是否校验证书，默认 `false` |
+| `JMS_AI_ENABLE` | 可选 | 是否启用风险会话 AI 语义分析，默认 `false` |
+| `JMS_AI_ENDPOINT` | AI 启用时建议必填 | AI 接口地址（兼容 chat completions 风格） |
+| `JMS_AI_MODEL` | AI 启用时建议必填 | 调用的模型名称 |
+| `JMS_AI_API_KEY` | 可选 | AI 接口鉴权 Token；部分网关可省略 |
+| `JMS_AI_TIMEOUT` | 可选 | AI 请求超时秒数，默认 `20` |
 
 环境变量规则：
 
@@ -112,6 +121,14 @@ python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability session-r
 - 如果 `.env` 缺失或不完整，可以直接通过自然语言对话补齐，运行时会在确认后生成或覆盖本地 `.env`。
 - 首次使用前，需要确保地址、认证方式、组织、超时和 TLS 配置齐全。
 - 如果切换了 JumpServer、账号、组织或 `.env` 内容，应重新执行完整预检。
+
+AI 语义分析触发规则：
+
+- 只有先识别出“可疑会话”后，系统才会尝试对该会话调用 AI 做语义补充。
+- 仅当 `JMS_AI_ENABLE=true`（或 `1/yes/on`）时才启用 AI 调用。
+- 启用 AI 后，若 `JMS_AI_ENDPOINT` 或 `JMS_AI_MODEL` 缺失，会降级为“不使用 AI”。
+- 接口请求失败、超时、空响应时，会降级为“不使用 AI”；规则评分仍会继续，不影响风险分计算。
+- 报告中“其中 X 个会话使用 AI 完成语义分析”统计的是最终 `ai_used=true` 的会话数。
 
 ## 典型请求示例
 
@@ -188,6 +205,12 @@ python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability session-r
 
 报告固定输出到 `reports/JumpServer-YYYY-MM-DD.html`。如果请求里涉及命令审计字段，报告会按既定规则处理可访问的 command storage 汇总，不需要使用者手动选择内部取数逻辑。
 报告成功时，默认先回显“报告已生成”，并附上报告文件路径、文件存在性/大小、模板路径、字段元数据路径、时间范围、组织和 `validation_summary`；简短摘要只能作为补充，不能替代这些报告产物信息。
+
+关于“0 个会话使用 AI”的常见原因：
+
+- 未开启 `JMS_AI_ENABLE`。
+- 未配置 `JMS_AI_ENDPOINT` 或 `JMS_AI_MODEL`。
+- AI 接口不可达、鉴权失败、超时，或返回内容不可解析。
 
 ## 组织选择与阻塞规则
 

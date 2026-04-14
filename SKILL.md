@@ -28,6 +28,9 @@ python3 scripts/jumpserver_api/jms_diagnose.py tickets --applicant example.user 
 python3 scripts/jumpserver_api/jms_query.py job-list --name 删除Windows用户
 python3 scripts/jumpserver_api/jms_diagnose.py reports --report-type account-statistic --days 30
 python3 scripts/jumpserver_api/jms_report.py daily-usage --period 上周 --org-name Default
+python3 scripts/jumpserver_api/jms_report.py schedule-report --schedule-for daily --org-name Default
+python3 scripts/jumpserver_api/jms_report.py schedule-report --schedule-for weekly --org-list Default,Production --retry-count 2 --retry-delay-seconds 2
+python3 scripts/jumpserver_api/jms_report.py schedule-report --schedule-for weekly --org-list Default,Production --dry-run
 ```
 
 阻塞或参数错误时，优先看返回里的 `reason_code`、`user_message`、`action_hint`、`suggested_commands`，不要只看顶层 `error`。
