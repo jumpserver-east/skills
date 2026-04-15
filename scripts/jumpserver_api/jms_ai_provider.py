@@ -43,10 +43,68 @@ def _build_prompt(payload: dict[str, Any]) -> list[dict[str, str]]:
     ]
 
 
-def analyze_session_with_ai(payload: dict[str, Any]) -> dict[str, Any]:
-    if not ai_enabled():
-        return {"ai_enabled": False, "ai_used": False}
+def _extract_chat_content(body: Any) -> str:
+    if not isinstance(body, dict):
+        return ""
+    return str((((body.get("choices") or [{}])[0].get("message") or {}).get("content") or "")).strip()
 
+
+def _parse_ai_content(content: str) -> dict[str, Any]:
+    try:
+        parsed = json.loads(content)
+    except Exception:  # noqa: BLE001
+        return {
+            "ai_used": True,
+            "ai_parse_error": True,
+            "raw_content": str(content),
+        }
+
+    if not isinstance(parsed, dict):
+        return {
+            "ai_used": True,
+            "ai_parse_error": True,
+            "raw_content": str(content),
+        }
+
+    return {
+        "ai_used": True,
+        "risk_summary": str(parsed.get("risk_summary") or "").strip(),
+        "confidence": parsed.get("confidence"),
+        "risk_factors": parsed.get("risk_factors") if isinstance(parsed.get("risk_factors"), list) else [],
+        "recommended_action": str(parsed.get("recommended_action") or "").strip(),
+    }
+
+
+def _call_chat_completion(
+    *,
+    endpoint: str,
+    model: str,
+    api_key: str,
+    timeout: int,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = "Bearer %s" % api_key
+
+    request_payload = {
+        "model": model,
+        "temperature": 0.1,
+        "messages": _build_prompt(payload),
+    }
+
+    response = requests.post(endpoint, headers=headers, json=request_payload, timeout=timeout)
+    response.raise_for_status()
+    content = _extract_chat_content(response.json())
+    if not content:
+        return {
+            "ai_used": False,
+            "ai_error": "empty_ai_response",
+        }
+    return _parse_ai_content(content)
+
+
+def _analyze_with_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
     endpoint = str(os.getenv("JMS_AI_ENDPOINT", "")).strip()
     model = str(os.getenv("JMS_AI_MODEL", "")).strip()
     api_key = str(os.getenv("JMS_AI_API_KEY", "")).strip()
@@ -59,20 +117,8 @@ def analyze_session_with_ai(payload: dict[str, Any]) -> dict[str, Any]:
             "ai_error": "missing_endpoint_or_model",
         }
 
-    headers = {"Content-Type": "application/json"}
-    if api_key:
-        headers["Authorization"] = "Bearer %s" % api_key
-
-    request_payload = {
-        "model": model,
-        "temperature": 0.1,
-        "messages": _build_prompt(payload),
-    }
-
     try:
-        response = requests.post(endpoint, headers=headers, json=request_payload, timeout=timeout)
-        response.raise_for_status()
-        body = response.json()
+        parsed = _call_chat_completion(endpoint=endpoint, model=model, api_key=api_key, timeout=timeout, payload=payload)
     except Exception as exc:  # noqa: BLE001
         return {
             "ai_enabled": True,
@@ -80,41 +126,12 @@ def analyze_session_with_ai(payload: dict[str, Any]) -> dict[str, Any]:
             "ai_error": str(exc),
         }
 
-    content = (
-        ((body.get("choices") or [{}])[0].get("message") or {}).get("content")
-        if isinstance(body, dict)
-        else None
-    )
-    if not content:
-        return {
-            "ai_enabled": True,
-            "ai_used": False,
-            "ai_error": "empty_ai_response",
-        }
+    parsed["ai_enabled"] = True
+    parsed["ai_provider"] = "endpoint"
+    return parsed
 
-    try:
-        parsed = json.loads(content)
-    except Exception:  # noqa: BLE001
-        return {
-            "ai_enabled": True,
-            "ai_used": True,
-            "ai_parse_error": True,
-            "raw_content": str(content),
-        }
 
-    if not isinstance(parsed, dict):
-        return {
-            "ai_enabled": True,
-            "ai_used": True,
-            "ai_parse_error": True,
-            "raw_content": str(content),
-        }
-
-    return {
-        "ai_enabled": True,
-        "ai_used": True,
-        "risk_summary": str(parsed.get("risk_summary") or "").strip(),
-        "confidence": parsed.get("confidence"),
-        "risk_factors": parsed.get("risk_factors") if isinstance(parsed.get("risk_factors"), list) else [],
-        "recommended_action": str(parsed.get("recommended_action") or "").strip(),
-    }
+def analyze_session_with_ai(payload: dict[str, Any]) -> dict[str, Any]:
+    if not ai_enabled():
+        return {"ai_enabled": False, "ai_used": False}
+    return _analyze_with_endpoint(payload)

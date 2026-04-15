@@ -108,8 +108,8 @@ python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability session-r
 | `JMS_TIMEOUT` | 可选 | 请求超时秒数 |
 | `JMS_VERIFY_TLS` | 可选 | 是否校验证书，默认 `false` |
 | `JMS_AI_ENABLE` | 可选 | 是否启用风险会话 AI 语义分析，默认 `false` |
-| `JMS_AI_ENDPOINT` | AI 启用时建议必填 | AI 接口地址（兼容 chat completions 风格） |
-| `JMS_AI_MODEL` | AI 启用时建议必填 | 调用的模型名称 |
+| `JMS_AI_ENDPOINT` | AI 启用时必填 | AI 接口地址（兼容 chat completions 风格） |
+| `JMS_AI_MODEL` | AI 启用时必填 | 调用的模型名称 |
 | `JMS_AI_API_KEY` | 可选 | AI 接口鉴权 Token；部分网关可省略 |
 | `JMS_AI_TIMEOUT` | 可选 | AI 请求超时秒数，默认 `20` |
 
@@ -125,8 +125,9 @@ python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability session-r
 AI 语义分析触发规则：
 
 - 只有先识别出“可疑会话”后，系统才会尝试对该会话调用 AI 做语义补充。
+- 若命令记录命中命令过滤策略风险等级 `拒绝/审批`、`接受/审批`、`告警`、`拒绝`，即使未命中高危命令正则，也会被纳入可疑会话并触发 AI 分析流程。
 - 仅当 `JMS_AI_ENABLE=true`（或 `1/yes/on`）时才启用 AI 调用。
-- 启用 AI 后，若 `JMS_AI_ENDPOINT` 或 `JMS_AI_MODEL` 缺失，会降级为“不使用 AI”。
+- AI 仅走显式 endpoint 调用路径，必须手动提供 `JMS_AI_ENDPOINT` 与 `JMS_AI_MODEL`。
 - 接口请求失败、超时、空响应时，会降级为“不使用 AI”；规则评分仍会继续，不影响风险分计算。
 - 报告中“其中 X 个会话使用 AI 完成语义分析”统计的是最终 `ai_used=true` 的会话数。
 
@@ -209,7 +210,7 @@ AI 语义分析触发规则：
 关于“0 个会话使用 AI”的常见原因：
 
 - 未开启 `JMS_AI_ENABLE`。
-- 未配置 `JMS_AI_ENDPOINT` 或 `JMS_AI_MODEL`。
+- 未配置 `JMS_AI_ENDPOINT` / `JMS_AI_MODEL`。
 - AI 接口不可达、鉴权失败、超时，或返回内容不可解析。
 
 ## 组织选择与阻塞规则

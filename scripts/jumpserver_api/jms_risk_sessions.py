@@ -54,6 +54,25 @@ RISK_TYPE_LABELS = {
     "privilege_escalation": "权限提升",
     "exfiltration": "数据外传",
     "credential_access": "凭据访问",
+    "command_filter_policy": "命令过滤策略",
+}
+
+COMMAND_FILTER_POLICY_SCORES = {
+    "reject/review": 30,
+    "accept/review": 18,
+    "notice": 25,
+    "reject": 22,
+}
+
+COMMAND_FILTER_POLICY_ALIASES = {
+    "拒绝/审批": "reject/review",
+    "reject/review": "reject/review",
+    "接受/审批": "accept/review",
+    "accept/review": "accept/review",
+    "告警": "notice",
+    "notice": "notice",
+    "拒绝": "reject",
+    "reject": "reject",
 }
 
 
@@ -86,6 +105,41 @@ def _risk_from_command(command: str) -> tuple[int, list[str], list[str]]:
                     matched_terms.append(term)
                 break
     return score, factors, matched_terms
+
+
+def _canonical_filter_policy(value: Any) -> str:
+    text = str(value or "").strip().lower().replace(" ", "")
+    if not text:
+        return ""
+    text = text.replace("／", "/")
+    return COMMAND_FILTER_POLICY_ALIASES.get(text, "")
+
+
+def _command_filter_policy_label(record: dict[str, Any]) -> str:
+    return str(
+        _first_field(
+            record,
+            "risk_level_display",
+            "risk_level.label",
+            "risk_level.name",
+            "risk_level",
+            "command_filter_risk_level",
+            "command_filter_level",
+        )
+        or ""
+    ).strip()
+
+
+def _risk_from_command_filter_policy(record: dict[str, Any]) -> tuple[int, list[str], list[str]]:
+    raw_label = _command_filter_policy_label(record)
+    canonical = _canonical_filter_policy(raw_label)
+    if not canonical:
+        return 0, [], []
+    score = int(COMMAND_FILTER_POLICY_SCORES.get(canonical, 0))
+    if score <= 0:
+        return 0, [], []
+    matched = raw_label or canonical
+    return score, ["command_filter_policy"], [matched]
 
 
 def _short_text(value: str, *, limit: int = 120) -> str:
@@ -137,15 +191,20 @@ def analyze_risky_sessions(
 
         for item in ordered:
             command = _command_text(item)
-            if not command:
-                continue
-            score, factors, matched_terms = _risk_from_command(command)
+            cmd_score, cmd_factors, cmd_terms = _risk_from_command(command) if command else (0, [], [])
+            policy_score, policy_factors, policy_terms = _risk_from_command_filter_policy(item)
+            score = cmd_score + policy_score
+            factors = cmd_factors + [factor for factor in policy_factors if factor not in cmd_factors]
+            matched_terms = cmd_terms + [term for term in policy_terms if term not in cmd_terms]
             total_score += score
             for factor in factors:
                 factor_counts[factor] += 1
-                rule_hits.append("%s:%s" % (factor, command[:60]))
+                preview = command[:60] if command else "[command-filter-policy]"
+                if factor == "command_filter_policy" and matched_terms:
+                    preview = "[policy=%s]" % matched_terms[0]
+                rule_hits.append("%s:%s" % (factor, preview))
             if score > 0:
-                risky_commands.append(command)
+                risky_commands.append(command or ("命令过滤策略命中(%s)" % (matched_terms[0] if matched_terms else "unknown")))
 
         if not risky_commands:
             continue
@@ -163,15 +222,17 @@ def analyze_risky_sessions(
         contexts = []
         for item in ordered:
             command = _command_text(item)
-            if not command:
-                continue
-            _, factors, matched_terms = _risk_from_command(command)
+            cmd_score, cmd_factors, cmd_terms = _risk_from_command(command) if command else (0, [], [])
+            policy_score, policy_factors, policy_terms = _risk_from_command_filter_policy(item)
+            _ = cmd_score + policy_score
+            factors = cmd_factors + [factor for factor in policy_factors if factor not in cmd_factors]
+            matched_terms = cmd_terms + [term for term in policy_terms if term not in cmd_terms]
             if not factors:
                 continue
             contexts.append(
                 {
                     "risk_types": factors,
-                    "command": _short_text(command, limit=180),
+                    "command": _short_text(command or ("[command-filter-policy] %s" % (matched_terms[0] if matched_terms else "unknown")), limit=180),
                     "matched_terms": matched_terms,
                 }
             )
@@ -208,6 +269,7 @@ def analyze_risky_sessions(
                 "command_chain": " -> ".join(risky_commands[:5]),
                 "analysis": analysis_text,
                 "ai_used": bool(ai_result.get("ai_used")),
+                "ai_provider": str(ai_result.get("ai_provider") or ""),
             }
         )
 
@@ -228,5 +290,5 @@ def analyze_risky_sessions(
         "risk_session_total": len(top_rows),
         "risk_sessions": top_rows,
         "risk_session_summary": summary,
-        "risk_scoring_notes": "评分=规则基线分+命令链加分+上下文序列加分；AI 仅用于语义解释，不覆盖规则判定。",
+        "risk_scoring_notes": "评分=规则基线分(含命令模式与命令过滤策略等级)+命令链加分+上下文序列加分；AI 仅用于语义解释，不覆盖规则判定。",
     }

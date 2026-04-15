@@ -104,8 +104,8 @@ If you want to provide everything up front, these are usually enough:
 | `JMS_TIMEOUT` | optional | request timeout in seconds |
 | `JMS_VERIFY_TLS` | optional | whether to verify certificates, default `false` |
 | `JMS_AI_ENABLE` | optional | enables AI semantic analysis for risky sessions, default `false` |
-| `JMS_AI_ENDPOINT` | recommended when AI is enabled | AI endpoint URL (chat-completions style) |
-| `JMS_AI_MODEL` | recommended when AI is enabled | model name to call |
+| `JMS_AI_ENDPOINT` | required when AI is enabled | AI endpoint URL (chat-completions style) |
+| `JMS_AI_MODEL` | required when AI is enabled | model name to call |
 | `JMS_AI_API_KEY` | optional | API token for AI endpoint; optional for some gateways |
 | `JMS_AI_TIMEOUT` | optional | AI request timeout in seconds, default `20` |
 
@@ -121,8 +121,9 @@ Environment variable rules:
 AI semantic-analysis trigger rules:
 
 - AI is only attempted after a session is already identified as suspicious by rule-based detection.
+- If command records hit command-filter policy levels `reject/review`, `accept/review`, `notice`, or plain `reject`, those sessions are included in suspicious-session analysis and will enter the AI analysis flow even when no high-risk command regex is matched.
 - AI calls are enabled only when `JMS_AI_ENABLE=true` (or `1/yes/on`).
-- If AI is enabled but `JMS_AI_ENDPOINT` or `JMS_AI_MODEL` is missing, the workflow degrades to non-AI mode.
+- AI uses a single explicit endpoint path and requires manual `JMS_AI_ENDPOINT` and `JMS_AI_MODEL` configuration.
 - If the AI request fails, times out, or returns empty content, the workflow degrades to non-AI mode; rule scoring still continues.
 - The report field "X sessions used AI semantic analysis" counts only sessions with final `ai_used=true`.
 
@@ -182,7 +183,7 @@ Reports are always written to `reports/JumpServer-YYYY-MM-DD.html`. If the reque
 Common reasons for "0 sessions used AI":
 
 - `JMS_AI_ENABLE` is not enabled.
-- `JMS_AI_ENDPOINT` or `JMS_AI_MODEL` is not configured.
+- `JMS_AI_ENDPOINT` / `JMS_AI_MODEL` is missing.
 - The AI endpoint is unreachable, unauthorized, timed out, or returned unparsable content.
 
 ## Organization Selection and Blocking Rules
