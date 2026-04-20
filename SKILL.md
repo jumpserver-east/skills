@@ -27,6 +27,8 @@ python3 scripts/jumpserver_api/jms_query.py terminal-sessions --view history --d
 python3 scripts/jumpserver_api/jms_diagnose.py tickets --applicant example.user --state closed --type command_confirm
 python3 scripts/jumpserver_api/jms_query.py job-list --name 删除Windows用户
 python3 scripts/jumpserver_api/jms_diagnose.py reports --report-type account-statistic --days 30
+python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability component-load-overview --days 1
+python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability change-password-failure-report --days 30
 python3 scripts/jumpserver_api/jms_report.py daily-usage --period 上周 --org-name Default
 ```
 
@@ -56,7 +58,13 @@ python3 scripts/jumpserver_api/jms_report.py daily-usage --period 上周 --org-n
 6. 如果用户要查页面同款审计明细、会话、命令、文件传输或作业列表，走 `jms_query.py`。
 动作：直接查明细优先 `audit-list`、`terminal-sessions`、`job-list`；做汇总分析再用 `audit-analyze --capability ...`。
 
-7. 如果用户要做治理巡检、聚合排行、账号治理、资产治理或系统巡检，走 `jms_diagnose.py inspect --capability ...`。
+7. 如果用户要查 JumpServer 各组件负载（CPU/内存/磁盘/在线会话）或组件状态总览，走组件负载 capability。
+动作：优先 `python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability component-load-overview ...`，按组件返回 `cpu_usage_percent`、`memory_usage_percent`、`disk_usage_percent`、`session_count`、`load_value/load_label` 与 `is_alive`、`is_active`。
+
+8. 如果用户要改密失败日志分析报表（报错类型、报错资产、成功/失败占比），走改密失败报表 capability。
+动作：优先 `python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability change-password-failure-report ...`，输出 `summary.top_error_types`、`summary.top_failed_assets`、`summary.success_rate`、`summary.failure_rate` 与失败明细。
+
+9. 如果用户要做治理巡检、聚合排行、账号治理、资产治理或系统巡检，走 `jms_diagnose.py inspect --capability ...`。
 动作：优先 capability，不手工拼多条零散查询。
 
 普通路由细节、更多命中说法和反例见 [references/routing-playbook.md](references/routing-playbook.md)。
@@ -235,6 +243,7 @@ python3 scripts/jumpserver_api/jms_report.py daily-usage --period 上周 --org-n
 - [运行入口与环境](references/runtime.md)
 - [审计与调查](references/audit.md)
 - [诊断与访问分析](references/diagnose.md)
+- [新增能力说明](references/component-load-and-password-report.md)
 - [安全规则](references/safety-rules.md)
 
 ## Response Checklist

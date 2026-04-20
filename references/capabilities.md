@@ -4,7 +4,7 @@
 
 - 这份文档是 `inspect/analyze + capability` 能力单元的人类索引。
 - 机器可执行的能力元数据位于 `references/metadata/capabilities.json`，由 `scripts/jumpserver_api/jms_capabilities.py` 负责加载。
-- 当前共维护 `67` 个能力单元，其中 `P0=5`、`P1=54`、`P2=8`。
+- 当前共维护 `69` 个能力单元，其中 `P0=5`、`P1=56`、`P2=8`。
 - 每个能力单元都在元数据里固定维护以下字段：
   - 功能名称
   - 能力分类
@@ -93,6 +93,8 @@
 | `replay-storage-query` | 录像存储查询 | 系统设置与配置巡检类 | `jms_diagnose.py inspect` | 专项能力 |
 | `report-query` | 统计报告查询 | 系统设置与配置巡检类 | `jms_diagnose.py inspect` | 专项能力 |
 | `account-automation-overview` | 账号自动化与风险概览 | 系统设置与配置巡检类 | `jms_diagnose.py inspect` | 专项能力 |
+| `component-load-overview` | 组件负载概览 | 系统设置与配置巡检类 | `jms_diagnose.py inspect` | 核心能力 |
+| `change-password-failure-report` | 改密失败报错分析报表 | 日志与审计类 | `jms_diagnose.py inspect` | 核心能力 |
 
 ## P2
 
