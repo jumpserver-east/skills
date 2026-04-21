@@ -101,7 +101,12 @@ def _tail(text: str, *, max_lines: int = 20) -> list[str]:
 
 
 def _print_json_error(message: str, *, details: dict) -> None:
-    json.dump({"ok": False, "error": message, "details": details}, sys.stdout, ensure_ascii=False, indent=2)
+    json.dump(
+        {"ok": False, "error": message, "details": details},
+        sys.stdout,
+        ensure_ascii=False,
+        indent=2,
+    )
     sys.stdout.write("\n")
 
 
@@ -121,7 +126,9 @@ def ensure_requirements_installed(requirements_file: Path | None = None) -> None
     if not required_distributions:
         return
 
-    missing_distributions = [name for name in required_distributions if not _is_distribution_installed(name)]
+    missing_distributions = [
+        name for name in required_distributions if not _is_distribution_installed(name)
+    ]
     if not missing_distributions:
         return
 
@@ -130,7 +137,9 @@ def ensure_requirements_installed(requirements_file: Path | None = None) -> None
         "[jumpserver-skills] Missing Python dependencies detected: %s. Installing with %s\n"
         % (", ".join(missing_distributions), " ".join(install_command))
     )
-    result = subprocess.run(install_command, capture_output=True, text=True, check=False)
+    result = subprocess.run(
+        install_command, capture_output=True, text=True, check=False
+    )
     if result.returncode != 0:
         _print_json_error(
             "Automatic dependency installation failed.",
@@ -146,7 +155,9 @@ def ensure_requirements_installed(requirements_file: Path | None = None) -> None
         raise SystemExit(1)
 
     importlib.invalidate_caches()
-    remaining_distributions = [name for name in missing_distributions if not _is_distribution_installed(name)]
+    remaining_distributions = [
+        name for name in missing_distributions if not _is_distribution_installed(name)
+    ]
     if remaining_distributions:
         _print_json_error(
             "Automatic dependency installation finished but required packages are still unavailable.",

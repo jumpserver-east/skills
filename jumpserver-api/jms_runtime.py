@@ -61,9 +61,7 @@ NONSECRET_ENV_KEYS = (
 ORG_LIST_PATH = "/api/v1/orgs/orgs/"
 ORG_CURRENT_PATH = "/api/v1/orgs/orgs/current/"
 USER_PROFILE_PATH = "/api/v1/users/profile/"
-ORG_SELECTION_NEXT_STEP = (
-    "python3 jumpserver-runtime-setup/scripts/jms_diagnose.py select-org --org-id <org-id> --confirm"
-)
+ORG_SELECTION_NEXT_STEP = "python3 jumpserver-runtime-setup/scripts/jms_diagnose.py select-org --org-id <org-id> --confirm"
 ORG_SELECTION_REQUIRED_REASON_CODE = "organization_selection_required"
 ORG_SELECTION_POLICY = "required_before_query_when_multiple_accessible_orgs"
 INVALID_JSON_PAYLOAD_REASON_CODE = "invalid_json_payload"
@@ -81,7 +79,9 @@ _GLOBAL_ORG_PROBE_ATTEMPTED = False
 _GLOBAL_ORG_PROBE_RESULT: dict[str, Any] | None = None
 
 
-class CLIHelpFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawTextHelpFormatter):
+class CLIHelpFormatter(
+    argparse.ArgumentDefaultsHelpFormatter, argparse.RawTextHelpFormatter
+):
     """Argparse formatter that keeps example newlines while still showing defaults."""
 
 
@@ -122,7 +122,9 @@ def rewrite_entrypoint_command(command_text: str, script_name: str) -> str:
     if not text:
         return ""
     pattern = r"^python3\s+\S*%s(?=\s|$)" % re.escape(script_name)
-    return re.sub(pattern, "python3 %s" % entrypoint_path_for(script_name), text, count=1)
+    return re.sub(
+        pattern, "python3 %s" % entrypoint_path_for(script_name), text, count=1
+    )
 
 
 def rewrite_entrypoint_commands(commands: list[str], script_name: str) -> list[str]:
@@ -174,7 +176,9 @@ def build_cli_guidance_payload(
         "reason_code": reason_code,
         "user_message": user_message,
         "action_hint": action_hint,
-        "suggested_commands": [item for item in (suggested_commands or []) if str(item or "").strip()],
+        "suggested_commands": [
+            item for item in (suggested_commands or []) if str(item or "").strip()
+        ],
     }
     for key, value in details.items():
         if value is not None:
@@ -269,11 +273,15 @@ def current_runtime_values(path: Path | None = None) -> dict[str, str]:
     return values
 
 
-def write_local_env_config(payload: dict[str, Any], path: Path | None = None) -> dict[str, Any]:
+def write_local_env_config(
+    payload: dict[str, Any], path: Path | None = None
+) -> dict[str, Any]:
     env_path = Path(path or LOCAL_ENV_FILE)
     final: dict[str, str] = {}
     current = read_local_env(env_path)
-    final.update({key: value for key, value in current.items() if key not in WRITEABLE_ENV_KEYS})
+    final.update(
+        {key: value for key, value in current.items() if key not in WRITEABLE_ENV_KEYS}
+    )
 
     for key in WRITEABLE_ENV_KEYS:
         value = payload.get(key)
@@ -306,7 +314,11 @@ def write_local_env_config(payload: dict[str, Any], path: Path | None = None) ->
 
 def current_nonsecret_view(values: dict[str, str] | None = None) -> dict[str, str]:
     payload = dict(values or current_runtime_values())
-    return {key: payload[key] for key in NONSECRET_ENV_KEYS if key in payload and payload[key] != ""}
+    return {
+        key: payload[key]
+        for key in NONSECRET_ENV_KEYS
+        if key in payload and payload[key] != ""
+    }
 
 
 def get_config_status(path: Path | None = None) -> dict[str, Any]:
@@ -343,7 +355,9 @@ def get_config_status(path: Path | None = None) -> dict[str, Any]:
         if partial_auth_fields:
             missing.extend(partial_auth_fields)
         else:
-            missing.append("JMS_ACCESS_KEY_ID/JMS_ACCESS_KEY_SECRET or JMS_USERNAME/JMS_PASSWORD")
+            missing.append(
+                "JMS_ACCESS_KEY_ID/JMS_ACCESS_KEY_SECRET or JMS_USERNAME/JMS_PASSWORD"
+            )
 
     auth_mode = "none"
     if has_aksk:
@@ -386,7 +400,8 @@ def parse_json_arg(
             "无法解析 %s 参数。" % source,
             payload=build_cli_guidance_payload(
                 INVALID_JSON_PAYLOAD_REASON_CODE,
-                user_message="%s 需要传入 JSON 对象字符串，例如 '{\"name\": \"Default\"}'。" % source,
+                user_message='%s 需要传入 JSON 对象字符串，例如 \'{"name": "Default"}\'。'
+                % source,
                 action_hint="优先改用显式参数或重复的 `--filter key=value`；如果继续使用 JSON，请检查引号、逗号和花括号。",
                 suggested_commands=usage_examples,
                 input_name=source,
@@ -400,7 +415,7 @@ def parse_json_arg(
             payload=build_cli_guidance_payload(
                 INVALID_JSON_PAYLOAD_REASON_CODE,
                 user_message="%s 需要传入 JSON 对象，而不是数组或普通字符串。" % source,
-                action_hint="请改成 `{\"key\": \"value\"}` 这种对象形式，或直接使用显式参数 / `--filter key=value`。",
+                action_hint='请改成 `{"key": "value"}` 这种对象形式，或直接使用显式参数 / `--filter key=value`。',
                 suggested_commands=usage_examples,
                 input_name=source,
                 raw_value=value,
@@ -423,7 +438,11 @@ def merge_filter_args(
         source="--filters",
         usage_examples=usage_examples,
     )
-    filters.update(parse_filter_assignments(getattr(args, "filter", None), usage_examples=usage_examples))
+    filters.update(
+        parse_filter_assignments(
+            getattr(args, "filter", None), usage_examples=usage_examples
+        )
+    )
     if isinstance(explicit_fields, dict):
         field_map = dict(explicit_fields)
     else:
@@ -509,7 +528,9 @@ def reject_deprecated_pagination_cli_args(
     cleaned_args = _strip_pagination_tokens(argv)
     suggested_commands: list[str] = []
     if cleaned_args:
-        suggested_commands.append(canonical_entrypoint_command(script_name, " ".join(cleaned_args)))
+        suggested_commands.append(
+            canonical_entrypoint_command(script_name, " ".join(cleaned_args))
+        )
     for item in (usage_examples_by_command or {}).get(command, []):
         if item not in suggested_commands:
             suggested_commands.append(item)
@@ -526,7 +547,9 @@ def reject_deprecated_pagination_cli_args(
     )
 
 
-def add_filter_arguments(parser: argparse.ArgumentParser, *, include_legacy_json: bool = True) -> None:
+def add_filter_arguments(
+    parser: argparse.ArgumentParser, *, include_legacy_json: bool = True
+) -> None:
     parser.add_argument(
         "--filter",
         action="append",
@@ -665,7 +688,9 @@ def _global_org_candidate() -> dict[str, Any] | None:
     else:
         candidate = {"id": GLOBAL_ORG_ID, "name": "Global"}
 
-    candidate["source"] = str(candidate.get("source") or "").strip() or "global_org_probe"
+    candidate["source"] = (
+        str(candidate.get("source") or "").strip() or "global_org_probe"
+    )
     _GLOBAL_ORG_PROBE_RESULT = candidate
     return dict(candidate)
 
@@ -691,14 +716,18 @@ def list_accessible_orgs(*, include_global_probe: bool = True) -> list[dict[str,
     return accessible_orgs
 
 
-def _switchable_orgs(accessible_orgs: list[dict[str, Any]], effective_org: dict[str, Any] | None) -> list[dict[str, Any]]:
+def _switchable_orgs(
+    accessible_orgs: list[dict[str, Any]], effective_org: dict[str, Any] | None
+) -> list[dict[str, Any]]:
     effective_org_id = str((effective_org or {}).get("id") or "").strip()
     if not effective_org_id:
         return []
     return [
         item
         for item in accessible_orgs
-        if isinstance(item, dict) and str(item.get("id") or "").strip() and str(item.get("id") or "").strip() != effective_org_id
+        if isinstance(item, dict)
+        and str(item.get("id") or "").strip()
+        and str(item.get("id") or "").strip() != effective_org_id
     ]
 
 
@@ -709,7 +738,9 @@ def _org_scope_label(effective_org: dict[str, Any] | None) -> str:
     return "%s (%s)" % (org_name, org_id)
 
 
-def _org_context_hint(effective_org: dict[str, Any] | None, switchable_orgs: list[dict[str, Any]]) -> str | None:
+def _org_context_hint(
+    effective_org: dict[str, Any] | None, switchable_orgs: list[dict[str, Any]]
+) -> str | None:
     if not effective_org or not switchable_orgs:
         return None
     org_scope = _org_scope_label(effective_org)
@@ -717,7 +748,10 @@ def _org_context_hint(effective_org: dict[str, Any] | None, switchable_orgs: lis
     if source == "env":
         return "当前查询范围固定为组织 %s；如需改查其他组织，请先切换组织。" % org_scope
     if source == "reserved_auto_select":
-        return "当前查询范围按保留组织规则固定为组织 %s；如需改查其他组织，请先切换组织。" % org_scope
+        return (
+            "当前查询范围按保留组织规则固定为组织 %s；如需改查其他组织，请先切换组织。"
+            % org_scope
+        )
     return "当前查询范围固定为组织 %s；如需切换查询范围，请先切换组织。" % org_scope
 
 
@@ -726,7 +760,8 @@ def build_org_selection_required_payload(context: dict[str, Any]) -> dict[str, A
     if not isinstance(candidate_orgs, list):
         candidate_orgs = []
     suggested_commands = [
-        "python3 jumpserver-runtime-setup/scripts/jms_diagnose.py select-org --org-id %s --confirm" % str(item.get("id") or "").strip()
+        "python3 jumpserver-runtime-setup/scripts/jms_diagnose.py select-org --org-id %s --confirm"
+        % str(item.get("id") or "").strip()
         for item in candidate_orgs[:3]
         if str(item.get("id") or "").strip()
     ]
@@ -735,7 +770,9 @@ def build_org_selection_required_payload(context: dict[str, Any]) -> dict[str, A
         "candidate_orgs": candidate_orgs,
         "candidate_org_count": len(candidate_orgs),
         "next_step": ORG_SELECTION_NEXT_STEP,
-        "reserved_org_auto_select_eligible": bool(context.get("reserved_org_auto_select_eligible")),
+        "reserved_org_auto_select_eligible": bool(
+            context.get("reserved_org_auto_select_eligible")
+        ),
         "reason_code": ORG_SELECTION_REQUIRED_REASON_CODE,
         "user_message": "检测到多个可访问组织，继续前必须先选择一个组织。",
         "action_hint": (
@@ -783,7 +820,11 @@ def resolve_effective_org_context(*, auto_select: bool = True) -> dict[str, Any]
     values = current_runtime_values()
     selected_org_id = str(values.get("JMS_ORG_ID") or "").strip()
     accessible_orgs = list_accessible_orgs()
-    by_id = {str(item.get("id") or ""): item for item in accessible_orgs if isinstance(item, dict)}
+    by_id = {
+        str(item.get("id") or ""): item
+        for item in accessible_orgs
+        if isinstance(item, dict)
+    }
     accessible_ids = frozenset([key for key in by_id if key])
     selected_org = by_id.get(selected_org_id) if selected_org_id else None
     reserved_auto_select_eligible = accessible_ids in RESERVED_AUTO_SELECT_ORG_SETS
@@ -807,7 +848,9 @@ def resolve_effective_org_context(*, auto_select: bool = True) -> dict[str, Any]
 
     if reserved_auto_select_eligible and auto_select:
         persist_selected_org(DEFAULT_ORG_ID)
-        auto_selected = dict(by_id.get(DEFAULT_ORG_ID) or {"id": DEFAULT_ORG_ID, "name": "Default"})
+        auto_selected = dict(
+            by_id.get(DEFAULT_ORG_ID) or {"id": DEFAULT_ORG_ID, "name": "Default"}
+        )
         auto_selected["source"] = "reserved_auto_select"
         switchable_orgs = _switchable_orgs(accessible_orgs, auto_selected)
         return {
@@ -847,14 +890,19 @@ def ensure_selected_org_context() -> dict[str, Any]:
     return context
 
 
-def resolve_platform_reference(value: str, *, discovery: JumpServerDiscovery | None = None) -> dict[str, Any]:
+def resolve_platform_reference(
+    value: str, *, discovery: JumpServerDiscovery | None = None
+) -> dict[str, Any]:
     active_discovery = discovery or create_discovery()
     wanted = str(value or "").strip().lower()
     exact = []
     category_matches = []
     for item in active_discovery.list_platforms():
         payload = item.to_dict()
-        names = {str(payload.get("name", "")).lower(), str(payload.get("slug", "")).lower()}
+        names = {
+            str(payload.get("name", "")).lower(),
+            str(payload.get("slug", "")).lower(),
+        }
         if wanted in names:
             exact.append(payload)
             continue
@@ -864,7 +912,11 @@ def resolve_platform_reference(value: str, *, discovery: JumpServerDiscovery | N
         return {"status": "resolved", "resolved": exact[0], "candidates": exact}
     if len(exact) > 1:
         return {"status": "ambiguous", "resolved": None, "candidates": exact}
-    return {"status": "candidate_only", "resolved": None, "candidates": category_matches}
+    return {
+        "status": "candidate_only",
+        "resolved": None,
+        "candidates": category_matches,
+    }
 
 
 def serialize(value: Any) -> Any:

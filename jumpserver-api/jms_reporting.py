@@ -56,10 +56,14 @@ JUMPSERVER_API_DIR = Path(__file__).resolve().parent
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SKILL_DIR = REPO_ROOT
 REPORT_TEMPLATE_PATH = REPO_ROOT / "template" / "bastion-daily-usage-template.html"
-REPORT_METADATA_PATH = REPO_ROOT / "references" / "metadata" / "daily_usage_report_template_fields.json"
+REPORT_METADATA_PATH = (
+    REPO_ROOT / "references" / "metadata" / "daily_usage_report_template_fields.json"
+)
 PLACEHOLDER_RE = re.compile(r"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}")
 DATE_COMPACT_RE = re.compile(r"^(?P<year>\d{4})(?P<month>\d{2})(?P<day>\d{2})$")
-DATE_CN_RE = re.compile(r"^(?:(?P<year>\d{4})\s*年)?\s*(?P<month>\d{1,2})\s*月\s*(?P<day>\d{1,2})\s*[日号]$")
+DATE_CN_RE = re.compile(
+    r"^(?:(?P<year>\d{4})\s*年)?\s*(?P<month>\d{1,2})\s*月\s*(?P<day>\d{1,2})\s*[日号]$"
+)
 EMPTY_TEXT = "暂无数据"
 if ZoneInfo is None:
     SHANGHAI_TZ = None
@@ -70,7 +74,12 @@ else:
         SHANGHAI_TZ = None
 TEXT_CONTRACT = "text"
 TBODY_ROWS_CONTRACT = "tbody_rows"
-REQUIRED_KEY_FIELDS = ("login_total", "login_failed", "session_total", "risk_event_total")
+REQUIRED_KEY_FIELDS = (
+    "login_total",
+    "login_failed",
+    "session_total",
+    "risk_event_total",
+)
 REPORT_RUNTIME_REQUIRED_FIELDS = (
     "output_path",
     "output_exists",
@@ -158,7 +167,9 @@ def extract_template_fields(template_html: str) -> list[str]:
     return sorted(set(PLACEHOLDER_RE.findall(template_html)))
 
 
-def _normalize_report_org_context(org_id: str | None, org_name: str | None = None) -> dict[str, Any]:
+def _normalize_report_org_context(
+    org_id: str | None, org_name: str | None = None
+) -> dict[str, Any]:
     accessible_orgs = list_accessible_orgs()
     requested_org_id = str(org_id or "").strip()
     requested_org_name = str(org_name or "").strip()
@@ -174,12 +185,24 @@ def _normalize_report_org_context(org_id: str | None, org_name: str | None = Non
             ),
         )
     if requested_org_id:
-        matches = [item for item in accessible_orgs if str(item.get("id") or "").strip() == requested_org_id]
+        matches = [
+            item
+            for item in accessible_orgs
+            if str(item.get("id") or "").strip() == requested_org_id
+        ]
     elif requested_org_name:
         wanted = requested_org_name.lower()
-        matches = [item for item in accessible_orgs if str(item.get("name") or "").strip().lower() == wanted]
+        matches = [
+            item
+            for item in accessible_orgs
+            if str(item.get("name") or "").strip().lower() == wanted
+        ]
     else:
-        matches = [item for item in accessible_orgs if str(item.get("id") or "").strip() == GLOBAL_ORG_ID]
+        matches = [
+            item
+            for item in accessible_orgs
+            if str(item.get("id") or "").strip() == GLOBAL_ORG_ID
+        ]
 
     if not matches:
         raise CLIError(
@@ -207,11 +230,16 @@ def _normalize_report_org_context(org_id: str | None, org_name: str | None = Non
     selected = matches[0]
     target_org_id = str(selected.get("id") or "").strip() or GLOBAL_ORG_ID
     effective_org = dict(selected)
-    effective_org["source"] = "explicit" if requested_org_id or requested_org_name else "report_default_global"
+    effective_org["source"] = (
+        "explicit"
+        if requested_org_id or requested_org_name
+        else "report_default_global"
+    )
     switchable_orgs = [
         item
         for item in accessible_orgs
-        if str(item.get("id") or "").strip() and str(item.get("id") or "").strip() != target_org_id
+        if str(item.get("id") or "").strip()
+        and str(item.get("id") or "").strip() != target_org_id
     ]
     return {
         "effective_org": effective_org,
@@ -247,7 +275,9 @@ def _parse_date_expr(value: str, *, reference_date: date) -> date:
         return parsed_date
     match = DATE_COMPACT_RE.fullmatch(compact)
     if match:
-        return date(int(match.group("year")), int(match.group("month")), int(match.group("day")))
+        return date(
+            int(match.group("year")), int(match.group("month")), int(match.group("day"))
+        )
     match = DATE_CN_RE.fullmatch(compact)
     if match:
         year = int(match.group("year") or reference_date.year)
@@ -264,7 +294,9 @@ def _parse_datetime_expr(value: str, *, end_of_day: bool = False) -> datetime:
         return parsed.astimezone() if parsed.tzinfo is None else parsed.astimezone()
     parsed_date = _parse_date_expr(text, reference_date=_local_now().date())
     hour, minute, second = (23, 59, 59) if end_of_day else (0, 0, 0)
-    parsed = datetime(parsed_date.year, parsed_date.month, parsed_date.day, hour, minute, second)
+    parsed = datetime(
+        parsed_date.year, parsed_date.month, parsed_date.day, hour, minute, second
+    )
     return parsed.replace(tzinfo=SHANGHAI_TZ) if SHANGHAI_TZ else parsed.astimezone()
 
 
@@ -315,8 +347,24 @@ def _normalize_time_window(
         date_to = _parse_datetime_expr(str(date_to_expr), end_of_day=True)
     elif str(date_expr or "").strip():
         parsed_date = _parse_date_expr(str(date_expr), reference_date=now.date())
-        date_from = datetime(parsed_date.year, parsed_date.month, parsed_date.day, 0, 0, 0, tzinfo=now.tzinfo)
-        date_to = datetime(parsed_date.year, parsed_date.month, parsed_date.day, 23, 59, 59, tzinfo=now.tzinfo)
+        date_from = datetime(
+            parsed_date.year,
+            parsed_date.month,
+            parsed_date.day,
+            0,
+            0,
+            0,
+            tzinfo=now.tzinfo,
+        )
+        date_to = datetime(
+            parsed_date.year,
+            parsed_date.month,
+            parsed_date.day,
+            23,
+            59,
+            59,
+            tzinfo=now.tzinfo,
+        )
     else:
         period = str(period_expr or "").strip()
         if period == "上周":
@@ -335,8 +383,24 @@ def _normalize_time_window(
                     action_hint="请改用支持的周期表达，或改用 `--date` / `--date-from` + `--date-to`。",
                 ),
             )
-        date_from = datetime(period_start.year, period_start.month, period_start.day, 0, 0, 0, tzinfo=now.tzinfo)
-        date_to = datetime(period_end.year, period_end.month, period_end.day, 23, 59, 59, tzinfo=now.tzinfo)
+        date_from = datetime(
+            period_start.year,
+            period_start.month,
+            period_start.day,
+            0,
+            0,
+            0,
+            tzinfo=now.tzinfo,
+        )
+        date_to = datetime(
+            period_end.year,
+            period_end.month,
+            period_end.day,
+            23,
+            59,
+            59,
+            tzinfo=now.tzinfo,
+        )
 
     if date_to < date_from:
         raise CLIError(
@@ -401,7 +465,9 @@ def _extract_reason(item: dict[str, Any]) -> str:
 
 
 def _extract_session_error_reason(item: dict[str, Any]) -> str:
-    return _string_value(_first_field(item, "error_reason.label", "error_reason.value")).strip()
+    return _string_value(
+        _first_field(item, "error_reason.label", "error_reason.value")
+    ).strip()
 
 
 def _display_session_error_reason(item: dict[str, Any]) -> str:
@@ -472,10 +538,15 @@ def _display_login_failure_reason(item: dict[str, Any]) -> str:
     lowered = raw_reason.lower()
     if "account has been locked" in lowered:
         return LOGIN_LOCKED_REASON_TEXT
-    if "username or password" in lowered and ("incorrect" in lowered or "wrong" in lowered):
+    if "username or password" in lowered and (
+        "incorrect" in lowered or "wrong" in lowered
+    ):
         match = LOGIN_REMAINING_TRIES_RE.search(raw_reason)
         if match:
-            return "%s，还可再尝试 %s 次" % (LOGIN_INVALID_CREDENTIALS_TEXT, match.group(1))
+            return "%s，还可再尝试 %s 次" % (
+                LOGIN_INVALID_CREDENTIALS_TEXT,
+                match.group(1),
+            )
         return LOGIN_INVALID_CREDENTIALS_TEXT
     return raw_reason
 
@@ -560,7 +631,13 @@ def _top_summary(counter: Counter[str], *, limit: int = 3) -> str:
     return " / ".join(rows) if rows else EMPTY_TEXT
 
 
-def _top_records_summary(rows: list[dict[str, Any]], *, keys: tuple[str, ...], count_key: str = "count", limit: int = 3) -> str:
+def _top_records_summary(
+    rows: list[dict[str, Any]],
+    *,
+    keys: tuple[str, ...],
+    count_key: str = "count",
+    limit: int = 3,
+) -> str:
     final = []
     for item in rows[:limit]:
         name = ""
@@ -572,20 +649,35 @@ def _top_records_summary(rows: list[dict[str, Any]], *, keys: tuple[str, ...], c
     return " / ".join(final) if final else EMPTY_TEXT
 
 
-def _risk_level_label(risk_event_total: int, login_failed: int, high_risk_command_total: int, file_transfer_total: int) -> str:
+def _risk_level_label(
+    risk_event_total: int,
+    login_failed: int,
+    high_risk_command_total: int,
+    file_transfer_total: int,
+) -> str:
     if risk_event_total >= 10 or high_risk_command_total >= 5 or login_failed >= 10:
         return "高风险"
-    if risk_event_total >= 3 or high_risk_command_total > 0 or login_failed >= 3 or file_transfer_total >= 20:
+    if (
+        risk_event_total >= 3
+        or high_risk_command_total > 0
+        or login_failed >= 3
+        or file_transfer_total >= 20
+    ):
         return "中风险"
     return "低风险"
 
 
 def _empty_row(colspan: int, text: str = EMPTY_TEXT) -> str:
-    return '<tr class="table-empty-row"><td colspan="%s">%s</td></tr>' % (colspan, escape(text))
+    return '<tr class="table-empty-row"><td colspan="%s">%s</td></tr>' % (
+        colspan,
+        escape(text),
+    )
 
 
 def _row(cells: list[Any]) -> str:
-    return "<tr>%s</tr>" % "".join("<td>%s</td>" % escape(str(cell or EMPTY_TEXT)) for cell in cells)
+    return "<tr>%s</tr>" % "".join(
+        "<td>%s</td>" % escape(str(cell or EMPTY_TEXT)) for cell in cells
+    )
 
 
 def _render_login_rows(records: list[dict[str, Any]]) -> str:
@@ -604,7 +696,9 @@ def _render_login_rows(records: list[dict[str, Any]]) -> str:
     )
 
 
-def _render_login_failed_rows(records: list[dict[str, Any]], *, common_ips: set[str]) -> str:
+def _render_login_failed_rows(
+    records: list[dict[str, Any]], *, common_ips: set[str]
+) -> str:
     if not records:
         return _empty_row(6)
     return "".join(
@@ -622,7 +716,9 @@ def _render_login_failed_rows(records: list[dict[str, Any]], *, common_ips: set[
     )
 
 
-def _render_distribution_rows(counter: Counter[str], *, total: int, first_label: str, colspan: int = 3) -> str:
+def _render_distribution_rows(
+    counter: Counter[str], *, total: int, first_label: str, colspan: int = 3
+) -> str:
     if not counter:
         return _empty_row(colspan)
     rows = []
@@ -634,13 +730,24 @@ def _render_distribution_rows(counter: Counter[str], *, total: int, first_label:
 def _render_asset_rows(counter: Counter[str]) -> str:
     if not counter:
         return _empty_row(2)
-    return "".join(_row([asset or "unknown", count]) for asset, count in counter.most_common(10))
+    return "".join(
+        _row([asset or "unknown", count]) for asset, count in counter.most_common(10)
+    )
 
 
 def _render_duration_rows(rows: list[dict[str, Any]]) -> str:
     if not rows:
         return _empty_row(3)
-    return "".join(_row([item.get("user"), item.get("asset"), _format_duration(item.get("duration_seconds"))]) for item in rows[:10])
+    return "".join(
+        _row(
+            [
+                item.get("user"),
+                item.get("asset"),
+                _format_duration(item.get("duration_seconds")),
+            ]
+        )
+        for item in rows[:10]
+    )
 
 
 def _render_session_failed_rows(rows: list[dict[str, Any]]) -> str:
@@ -671,8 +778,14 @@ def _render_command_risk_rows(rows: list[dict[str, Any]]) -> str:
                 _extract_account(item),
                 _extract_command_text(item),
                 _format_datetime(_extract_datetime(item)),
-                _format_datetime(_first_field(item, "date_end", "date_finished", "date_to")),
-                _string_value(_first_field(item, "risk_level_display", "risk_level.value", "risk_level")),
+                _format_datetime(
+                    _first_field(item, "date_end", "date_finished", "date_to")
+                ),
+                _string_value(
+                    _first_field(
+                        item, "risk_level_display", "risk_level.value", "risk_level"
+                    )
+                ),
             ]
         )
         for item in rows[:10]
@@ -719,11 +832,19 @@ def _normalize_license_source() -> dict[str, Any]:
 
 def _normalize_login_source(filters: dict[str, Any]) -> dict[str, Any]:
     records = list(_login_records(filters))
-    records.sort(key=lambda item: _extract_datetime(item) or datetime.min.replace(tzinfo=_local_now().tzinfo), reverse=True)
+    records.sort(
+        key=lambda item: _extract_datetime(item)
+        or datetime.min.replace(tzinfo=_local_now().tzinfo),
+        reverse=True,
+    )
     failed_records = [item for item in records if _is_failed_login(item)]
     success_records = [item for item in records if not _is_failed_login(item)]
-    city_counter = Counter(city for city in (_extract_city(item) for item in records) if city)
-    ip_counter = Counter(ip for ip in (_extract_source_ip(item) for item in records) if ip)
+    city_counter = Counter(
+        city for city in (_extract_city(item) for item in records) if city
+    )
+    ip_counter = Counter(
+        ip for ip in (_extract_source_ip(item) for item in records) if ip
+    )
     common_ips = {ip for ip, count in ip_counter.items() if count > 1}
     if not common_ips and ip_counter:
         common_ips = {ip for ip, _ in ip_counter.most_common(3)}
@@ -734,7 +855,9 @@ def _normalize_login_source(filters: dict[str, Any]) -> dict[str, Any]:
         "unique_login_city_count": len(city_counter),
         "top_login_ip_summary": _top_summary(ip_counter),
         "rows_html": _render_login_rows(records),
-        "login_failed_rows": _render_login_failed_rows(failed_records, common_ips=common_ips),
+        "login_failed_rows": _render_login_failed_rows(
+            failed_records, common_ips=common_ips
+        ),
         "records": records,
         "failed_records": failed_records,
     }
@@ -742,11 +865,21 @@ def _normalize_login_source(filters: dict[str, Any]) -> dict[str, Any]:
 
 def _normalize_session_source(filters: dict[str, Any]) -> dict[str, Any]:
     records = list(_fetch_session_records(filters))
-    records.sort(key=lambda item: _extract_datetime(item) or datetime.min.replace(tzinfo=_local_now().tzinfo), reverse=True)
-    durations = [value for value in (_extract_duration(item) for item in records) if value is not None]
+    records.sort(
+        key=lambda item: _extract_datetime(item)
+        or datetime.min.replace(tzinfo=_local_now().tzinfo),
+        reverse=True,
+    )
+    durations = [
+        value
+        for value in (_extract_duration(item) for item in records)
+        if value is not None
+    ]
     total_duration = sum(durations) if durations else 0.0
     protocol_counter = Counter(_extract_protocol(item) or "unknown" for item in records)
-    component_counter = Counter(_extract_component(item) or "unknown" for item in records)
+    component_counter = Counter(
+        _extract_component(item) or "unknown" for item in records
+    )
     user_counter = Counter(_extract_user(item) or "unknown" for item in records)
     asset_counter = Counter(_extract_asset(item) or "unknown" for item in records)
     duration_rows = []
@@ -767,7 +900,9 @@ def _normalize_session_source(filters: dict[str, Any]) -> dict[str, Any]:
     return {
         "session_total": len(records),
         "session_total_duration": _format_duration(total_duration),
-        "avg_session_duration": _format_duration((total_duration / len(durations)) if durations else None),
+        "avg_session_duration": _format_duration(
+            (total_duration / len(durations)) if durations else None
+        ),
         "longest_session": (
             "%s / %s / %s"
             % (
@@ -778,9 +913,15 @@ def _normalize_session_source(filters: dict[str, Any]) -> dict[str, Any]:
             if duration_rows
             else EMPTY_TEXT
         ),
-        "protocol_distribution_rows": _render_distribution_rows(protocol_counter, total=len(records), first_label="协议"),
-        "component_distribution_rows": _render_distribution_rows(component_counter, total=len(records), first_label="组件"),
-        "session_user_top10_rows": _render_distribution_rows(user_counter, total=len(records), first_label="用户"),
+        "protocol_distribution_rows": _render_distribution_rows(
+            protocol_counter, total=len(records), first_label="协议"
+        ),
+        "component_distribution_rows": _render_distribution_rows(
+            component_counter, total=len(records), first_label="组件"
+        ),
+        "session_user_top10_rows": _render_distribution_rows(
+            user_counter, total=len(records), first_label="用户"
+        ),
         "session_asset_top10_rows": _render_asset_rows(asset_counter),
         "session_duration_top10_rows": _render_duration_rows(duration_rows),
         "session_failed_rows": _render_session_failed_rows(failed_records),
@@ -789,7 +930,9 @@ def _normalize_session_source(filters: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _build_command_filters(filters: dict[str, Any], command_storage_id: str | None) -> dict[str, Any]:
+def _build_command_filters(
+    filters: dict[str, Any], command_storage_id: str | None
+) -> dict[str, Any]:
     payload = {
         "date_from": filters["date_from"],
         "date_to": filters["date_to"],
@@ -802,10 +945,22 @@ def _build_command_filters(filters: dict[str, Any], command_storage_id: str | No
     return payload
 
 
-def _normalize_command_source(filters: dict[str, Any], command_storage_id: str | None) -> dict[str, Any]:
+def _normalize_command_source(
+    filters: dict[str, Any], command_storage_id: str | None
+) -> dict[str, Any]:
     command_filters = _build_command_filters(filters, command_storage_id)
     records = list(_fetch_command_records(command_filters))
-    risk_counter = Counter(str(_string_value(_first_field(item, "risk_level_display", "risk_level.value", "risk_level")) or "unknown") for item in records)
+    risk_counter = Counter(
+        str(
+            _string_value(
+                _first_field(
+                    item, "risk_level_display", "risk_level.value", "risk_level"
+                )
+            )
+            or "unknown"
+        )
+        for item in records
+    )
     user_counter = Counter(_extract_user(item) or "unknown" for item in records)
     asset_counter = Counter(_extract_asset(item) or "unknown" for item in records)
     storage_context = resolve_command_storage_context(command_filters)
@@ -813,13 +968,17 @@ def _normalize_command_source(filters: dict[str, Any], command_storage_id: str |
         "command_total": len(records),
         "top_command_users": _top_summary(user_counter),
         "top_command_assets": _top_summary(asset_counter),
-        "risk_levels": [{"name": key, "count": value} for key, value in risk_counter.most_common(10)],
+        "risk_levels": [
+            {"name": key, "count": value} for key, value in risk_counter.most_common(10)
+        ],
         "records": records,
         **storage_context,
     }
 
 
-def _normalize_high_risk_command_source(command_source: dict[str, Any]) -> dict[str, Any]:
+def _normalize_high_risk_command_source(
+    command_source: dict[str, Any],
+) -> dict[str, Any]:
     records = [
         item
         for item in command_source.get("records", [])
@@ -834,7 +993,9 @@ def _normalize_high_risk_command_source(command_source: dict[str, Any]) -> dict[
 
 def _normalize_file_transfer_source(filters: dict[str, Any]) -> dict[str, Any]:
     records = list(_fetch_file_transfer_records(filters))
-    direction_counter = Counter(_normalize_direction(_extract_direction(item)) for item in records)
+    direction_counter = Counter(
+        _normalize_direction(_extract_direction(item)) for item in records
+    )
     user_counter = Counter(_extract_user(item) or "unknown" for item in records)
     asset_counter = Counter(_extract_asset(item) or "unknown" for item in records)
     return {
@@ -880,9 +1041,15 @@ def _collect_source_payloads(
             return cache[source_key]
         if source_key == "runtime":
             payload = dict(runtime_context)
-        elif source_key == "entrypoint:python3 jumpserver-governance-inspection/scripts/jms_diagnose.py license-detail":
+        elif (
+            source_key
+            == "entrypoint:python3 jumpserver-governance-inspection/scripts/jms_diagnose.py license-detail"
+        ):
             payload = _normalize_license_source()
-        elif source_key == "entrypoint:python3 jumpserver-audit-investigation/scripts/jms_query.py audit-list --audit-type login":
+        elif (
+            source_key
+            == "entrypoint:python3 jumpserver-audit-investigation/scripts/jms_query.py audit-list --audit-type login"
+        ):
             payload = _normalize_login_source(filters)
         elif source_key == "capability:session-record-query":
             payload = _normalize_session_source(filters)
@@ -904,7 +1071,9 @@ def _collect_source_payloads(
         elif source_key == "capability:command-record-query":
             payload = _normalize_command_source(filters, command_storage_id)
         elif source_key == "capability:high-risk-command-audit":
-            payload = _normalize_high_risk_command_source(fetch("capability:command-record-query"))
+            payload = _normalize_high_risk_command_source(
+                fetch("capability:command-record-query")
+            )
         elif source_key == "capability:file-transfer-log-query":
             payload = _normalize_file_transfer_source(filters)
         elif source_key == "capability:file-transfer-heavy-ranking":
@@ -916,7 +1085,9 @@ def _collect_source_payloads(
         elif source_key == "capability:suspicious-operation-summary":
             payload = _normalize_suspicious_source(filters)
         elif source_key == "capability:failed-login-statistics":
-            login_payload = fetch("entrypoint:python3 jumpserver-audit-investigation/scripts/jms_query.py audit-list --audit-type login")
+            login_payload = fetch(
+                "entrypoint:python3 jumpserver-audit-investigation/scripts/jms_query.py audit-list --audit-type login"
+            )
             payload = {
                 "login_failed": login_payload.get("login_failed"),
                 "rows_html": login_payload.get("login_failed_rows"),
@@ -936,7 +1107,9 @@ def _collect_source_payloads(
     return cache
 
 
-def _resolve_simple_field(field_spec: dict[str, Any], source_payloads: dict[str, dict[str, Any]]) -> Any:
+def _resolve_simple_field(
+    field_spec: dict[str, Any], source_payloads: dict[str, dict[str, Any]]
+) -> Any:
     field_name = str(field_spec.get("field") or "")
     for source in field_spec.get("sources") or []:
         if not isinstance(source, dict):
@@ -947,7 +1120,11 @@ def _resolve_simple_field(field_spec: dict[str, Any], source_payloads: dict[str,
             value = _evaluate_output_expression(payload, str(output_field))
             if value not in {None, ""}:
                 return value
-        elif field_name and field_name in payload and payload.get(field_name) not in {None, ""}:
+        elif (
+            field_name
+            and field_name in payload
+            and payload.get(field_name) not in {None, ""}
+        ):
             return payload.get(field_name)
     return None
 
@@ -1075,7 +1252,9 @@ def _render_field_value(field_spec: dict[str, Any], value: Any) -> str:
 def render_report_html(template_html: str, field_values: dict[str, str]) -> str:
     rendered = template_html
     for key, value in field_values.items():
-        rendered = re.sub(r"\{\{\s*%s\s*\}\}" % re.escape(key), lambda _: value, rendered)
+        rendered = re.sub(
+            r"\{\{\s*%s\s*\}\}" % re.escape(key), lambda _: value, rendered
+        )
     return rendered
 
 
@@ -1146,7 +1325,13 @@ def validate_report_contract(
             dummy_values[field_name] = "sample_%s" % field_name
     rendered = render_report_html(template_payload, dummy_values)
     placeholder_residue = sorted(set(PLACEHOLDER_RE.findall(rendered)))
-    required_unbound = sorted([field for field in required_fields if field not in dummy_values or dummy_values[field] in {"", None}])
+    required_unbound = sorted(
+        [
+            field
+            for field in required_fields
+            if field not in dummy_values or dummy_values[field] in {"", None}
+        ]
+    )
     return {
         "template_field_count": len(template_fields),
         "metadata_field_count": len(metadata_fields),
@@ -1166,16 +1351,30 @@ def validate_report_contract(
 def validate_report_runtime_result(payload: dict[str, Any]) -> dict[str, Any]:
     result = dict(payload or {})
     failures: list[str] = []
-    missing_fields = [field for field in REPORT_RUNTIME_REQUIRED_FIELDS if field not in result]
+    missing_fields = [
+        field for field in REPORT_RUNTIME_REQUIRED_FIELDS if field not in result
+    ]
     if missing_fields:
-        failures.append("Runtime report payload is missing fields: %s" % ", ".join(sorted(missing_fields)))
+        failures.append(
+            "Runtime report payload is missing fields: %s"
+            % ", ".join(sorted(missing_fields))
+        )
 
-    for key in ("template_path", "metadata_path", "report_date", "date_from", "date_to"):
+    for key in (
+        "template_path",
+        "metadata_path",
+        "report_date",
+        "date_from",
+        "date_to",
+    ):
         if key in result and not str(result.get(key) or "").strip():
             failures.append("Runtime report field %s is empty." % key)
 
     effective_org = result.get("effective_org")
-    if not isinstance(effective_org, dict) or not str(effective_org.get("id") or "").strip():
+    if (
+        not isinstance(effective_org, dict)
+        or not str(effective_org.get("id") or "").strip()
+    ):
         failures.append("effective_org must contain a non-empty id.")
 
     switchable_orgs = result.get("switchable_orgs")
@@ -1199,7 +1398,9 @@ def validate_report_runtime_result(payload: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(validation_summary, dict):
         failures.append("validation_summary must be a dict.")
     elif not validation_summary.get("passed"):
-        failures.append("validation_summary.passed must be true for successful report generation.")
+        failures.append(
+            "validation_summary.passed must be true for successful report generation."
+        )
 
     output_path_text = str(result.get("output_path") or "").strip()
     if not output_path_text:
@@ -1226,7 +1427,9 @@ def validate_report_runtime_result(payload: dict[str, Any]) -> dict[str, Any]:
             failures.append("Report output artifact could not be stat'ed: %s" % exc)
         else:
             if actual_size_bytes <= 0:
-                failures.append("Report output artifact is empty: %s" % output_path_text)
+                failures.append(
+                    "Report output artifact is empty: %s" % output_path_text
+                )
 
     if bool(result.get("output_exists")) != actual_exists:
         failures.append("output_exists does not match filesystem state.")
@@ -1238,13 +1441,19 @@ def validate_report_runtime_result(payload: dict[str, Any]) -> dict[str, Any]:
         output_size_bytes = None
     if output_size_bytes is not None and output_size_bytes < 0:
         failures.append("output_size_bytes must not be negative.")
-    if actual_exists and output_size_bytes is not None and output_size_bytes != actual_size_bytes:
+    if (
+        actual_exists
+        and output_size_bytes is not None
+        and output_size_bytes != actual_size_bytes
+    ):
         failures.append("output_size_bytes does not match filesystem state.")
 
     output_size_human = str(result.get("output_size_human") or "").strip()
     if not output_size_human:
         failures.append("output_size_human is empty.")
-    elif actual_exists and output_size_human != _format_output_size_human(actual_size_bytes):
+    elif actual_exists and output_size_human != _format_output_size_human(
+        actual_size_bytes
+    ):
         failures.append("output_size_human does not match filesystem state.")
 
     return {
@@ -1265,23 +1474,35 @@ def _validate_report_output(
     warnings: list[str] = []
     placeholder_residue = sorted(set(PLACEHOLDER_RE.findall(rendered_html)))
     if placeholder_residue:
-        failures.append("Rendered HTML still contains placeholders: %s" % ", ".join(placeholder_residue))
+        failures.append(
+            "Rendered HTML still contains placeholders: %s"
+            % ", ".join(placeholder_residue)
+        )
 
     required_fields = [
         item.get("field")
         for item in metadata.get("fields", [])
         if isinstance(item, dict) and item.get("required") and item.get("field")
     ]
-    missing_required = [field for field in required_fields if field_values.get(str(field), "") in {"", None}]
+    missing_required = [
+        field
+        for field in required_fields
+        if field_values.get(str(field), "") in {"", None}
+    ]
     if missing_required:
-        failures.append("Required fields are empty: %s" % ", ".join(sorted(missing_required)))
+        failures.append(
+            "Required fields are empty: %s" % ", ".join(sorted(missing_required))
+        )
 
     for key in REQUIRED_KEY_FIELDS:
         value = str(field_values.get(key) or "").strip()
         if not value:
             failures.append("Key field %s is empty." % key)
 
-    login_payload = source_payloads.get("entrypoint:python3 jumpserver-audit-investigation/scripts/jms_query.py audit-list --audit-type login", {})
+    login_payload = source_payloads.get(
+        "entrypoint:python3 jumpserver-audit-investigation/scripts/jms_query.py audit-list --audit-type login",
+        {},
+    )
     session_payload = source_payloads.get("capability:session-record-query", {})
     risk_payload = source_payloads.get("capability:suspicious-operation-summary", {})
     for field_name, source_total in (
@@ -1291,10 +1512,14 @@ def _validate_report_output(
     ):
         rendered_value = str(field_values.get(field_name) or "").strip()
         if source_total > 0 and rendered_value in {"0", EMPTY_TEXT, ""}:
-            failures.append("Field %s lost non-empty source data during rendering." % field_name)
+            failures.append(
+                "Field %s lost non-empty source data during rendering." % field_name
+            )
 
     if rendered_html.count(EMPTY_TEXT) > 12:
-        warnings.append("Rendered report still contains many '%s' markers." % EMPTY_TEXT)
+        warnings.append(
+            "Rendered report still contains many '%s' markers." % EMPTY_TEXT
+        )
 
     return {
         "passed": not failures,
@@ -1382,7 +1607,9 @@ def build_daily_usage_report(
 
     output = _default_report_output_path(context["runtime_context"]["report_date"])
     output.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False, dir=str(output.parent), suffix=".html") as handle:
+    with tempfile.NamedTemporaryFile(
+        "w", encoding="utf-8", delete=False, dir=str(output.parent), suffix=".html"
+    ) as handle:
         handle.write(rendered_html)
         temp_name = handle.name
     os.replace(temp_name, output)
@@ -1394,8 +1621,11 @@ def build_daily_usage_report(
         "metadata_path": str(REPORT_METADATA_PATH.relative_to(SKILL_DIR)),
         "effective_org": context["org_context"]["effective_org"],
         "switchable_orgs": context["org_context"]["switchable_orgs"],
-        "queried_command_storage_ids": command_source.get("queried_command_storage_ids") or [],
-        "queried_command_storage_count": int(command_source.get("queried_command_storage_count") or 0),
+        "queried_command_storage_ids": command_source.get("queried_command_storage_ids")
+        or [],
+        "queried_command_storage_count": int(
+            command_source.get("queried_command_storage_count") or 0
+        ),
         "report_date": context["runtime_context"]["report_date"],
         "date_from": context["runtime_context"]["date_from"],
         "date_to": context["runtime_context"]["date_to"],

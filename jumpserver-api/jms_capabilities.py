@@ -52,7 +52,8 @@ def load_capability_metadata() -> list[dict[str, object]]:
     payload = _read_json_file("capabilities.json")
     if not isinstance(payload, list):
         raise JumpServerAPIError(
-            "Capability metadata must be a json array: %s" % metadata_path("capabilities.json")
+            "Capability metadata must be a json array: %s"
+            % metadata_path("capabilities.json")
         )
     items: list[dict[str, object]] = []
     for index, item in enumerate(payload):
@@ -63,7 +64,10 @@ def load_capability_metadata() -> list[dict[str, object]]:
         items.append(item)
     return items
 
-def _coerce_sequence(raw: dict[str, object], field_name: str, capability_id: str) -> tuple[str, ...]:
+
+def _coerce_sequence(
+    raw: dict[str, object], field_name: str, capability_id: str
+) -> tuple[str, ...]:
     value = raw.get(field_name)
     if not isinstance(value, list):
         raise JumpServerAPIError(
