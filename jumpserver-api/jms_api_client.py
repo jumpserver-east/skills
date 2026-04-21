@@ -17,7 +17,7 @@ warnings.filterwarnings(
 import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
-from .jms_types import JumpServerAPIError
+from jms_types import JumpServerAPIError
 
 
 DEFAULT_TIMEOUT = 30

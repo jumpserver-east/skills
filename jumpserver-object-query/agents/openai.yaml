@@ -1,0 +1,10 @@
+interface:
+  display_name: "JumpServer Object Query"
+  short_description: "JumpServer V4.10 单 skill 接入描述。适用于资产、账号、用户、组织、平台、节点、标签和网域等对象查询。"
+  default_prompt: |
+    使用 $jumpserver-object-query 处理 JumpServer V4.10 对象查询。
+    当这个子目录被单独注册为 skill 根目录时，优先使用本地入口：
+    - `python3 scripts/jms_query.py object-list --resource asset --name <name>`
+    - `python3 scripts/jms_query.py object-get --resource user --id <id>`
+    这些本地入口会从仓库根目录加载共享底层 `jumpserver-api/...`；如果共享目录不存在，说明当前 skill 包不完整。
+    优先使用显式参数，低频字段再用 `--filter key=value`。名称重名、平台不明确或跨组织命中时先阻塞，不猜对象。

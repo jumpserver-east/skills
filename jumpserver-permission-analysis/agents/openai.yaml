@@ -1,0 +1,11 @@
+interface:
+  display_name: "JumpServer Permission Analysis"
+  short_description: "JumpServer V4.10 单 skill 接入描述。适用于授权规则、ACL、RBAC、资产授权给了谁，以及为什么能访问这类权限分析问题。"
+  default_prompt: |
+    使用 $jumpserver-permission-analysis 处理 JumpServer V4.10 权限与授权分析。
+    当这个子目录被单独注册为 skill 根目录时，优先使用本地入口：
+    - `python3 scripts/jms_query.py asset-perm-users --asset-id <asset-id>`
+    - `python3 scripts/jms_query.py permission-list --resource asset-permission --name <name>`
+    - `python3 scripts/jms_diagnose.py asset-permission-explain --asset-name <asset>`
+    这些本地入口会从仓库根目录加载共享底层 `jumpserver-api/...`；如果共享目录不存在，说明当前 skill 包不完整。
+    默认区分授权主体和实际可访问者，不默认把超级管理员混入授权主体。权限问题只读不写。

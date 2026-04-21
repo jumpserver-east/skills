@@ -2,7 +2,7 @@
 
 ## 快速概览
 
-- 主入口：`python3 scripts/jumpserver_api/jms_diagnose.py <subcommand> ...`
+- 主入口：`python3 jumpserver-runtime-setup/scripts/jms_diagnose.py <subcommand> ...`
 - 适合连通性检查、对象解析、用户有效访问范围分析、最近审计预检、系统设置巡检、许可证读取、工单列表、终端组件/命令存储/录像存储查询、报表读取、账号自动化概览、核心端点 inventory 与按路径验证。
 - `select-org` 是显式组织选择入口；未选组织时，除 `config-status`、`config-write`、`ping`、`select-org` 外，其余子命令都会先阻塞。
 - 当当前组织已生效时，`ping`、`select-org` 以及主要查询结果会额外回显仍可切换的组织列表，便于继续按其他组织范围查询。
@@ -80,41 +80,41 @@
 预检与组织：
 
 ```bash
-python3 scripts/jumpserver_api/jms_diagnose.py config-status --json
-python3 scripts/jumpserver_api/jms_diagnose.py ping
-python3 scripts/jumpserver_api/jms_diagnose.py select-org
-python3 scripts/jumpserver_api/jms_diagnose.py select-org --org-name Default
+python3 jumpserver-runtime-setup/scripts/jms_diagnose.py config-status --json
+python3 jumpserver-runtime-setup/scripts/jms_diagnose.py ping
+python3 jumpserver-runtime-setup/scripts/jms_diagnose.py select-org
+python3 jumpserver-runtime-setup/scripts/jms_diagnose.py select-org --org-name Default
 ```
 
 对象解析与有效访问范围：
 
 ```bash
-python3 scripts/jumpserver_api/jms_diagnose.py resolve --resource account --name root
-python3 scripts/jumpserver_api/jms_diagnose.py resolve-platform --value Unix
-python3 scripts/jumpserver_api/jms_diagnose.py user-assets --org-name Default --username example.user
-python3 scripts/jumpserver_api/jms_diagnose.py user-nodes --user-id 4f8b763f-5c21-4b77-903c-37a7838968ae
-python3 scripts/jumpserver_api/jms_diagnose.py user-asset-access --user-id 4f8b763f-5c21-4b77-903c-37a7838968ae --asset-id 84d763b2-08bb-4d39-8fab-993714857642
+python3 jumpserver-runtime-setup/scripts/jms_diagnose.py resolve --resource account --name root
+python3 jumpserver-runtime-setup/scripts/jms_diagnose.py resolve-platform --value Unix
+python3 jumpserver-effective-access/scripts/jms_diagnose.py user-assets --org-name Default --username example.user
+python3 jumpserver-effective-access/scripts/jms_diagnose.py user-nodes --user-id 4f8b763f-5c21-4b77-903c-37a7838968ae
+python3 jumpserver-effective-access/scripts/jms_diagnose.py user-asset-access --user-id 4f8b763f-5c21-4b77-903c-37a7838968ae --asset-id 84d763b2-08bb-4d39-8fab-993714857642
 ```
 
 最近审计与工单：
 
 ```bash
-python3 scripts/jumpserver_api/jms_diagnose.py recent-audit --audit-type login --days 30 --username 示例用户(example.user)
-python3 scripts/jumpserver_api/jms_diagnose.py recent-audit --audit-type login --days 30 --username 示例用户(example.user) --status 1
-python3 scripts/jumpserver_api/jms_diagnose.py recent-audit --audit-type session --user example.user --account root --asset demo-host --login-from WT
-python3 scripts/jumpserver_api/jms_diagnose.py recent-audit --audit-type operate --days 30 --user example.user --action 创建 --resource-type 'User session'
-python3 scripts/jumpserver_api/jms_diagnose.py tickets --applicant example.user --state closed --type command_confirm
+python3 jumpserver-audit-investigation/scripts/jms_diagnose.py recent-audit --audit-type login --days 30 --username 示例用户(example.user)
+python3 jumpserver-audit-investigation/scripts/jms_diagnose.py recent-audit --audit-type login --days 30 --username 示例用户(example.user) --status 1
+python3 jumpserver-audit-investigation/scripts/jms_diagnose.py recent-audit --audit-type session --user example.user --account root --asset demo-host --login-from WT
+python3 jumpserver-audit-investigation/scripts/jms_diagnose.py recent-audit --audit-type operate --days 30 --user example.user --action 创建 --resource-type 'User session'
+python3 jumpserver-governance-inspection/scripts/jms_diagnose.py tickets --applicant example.user --state closed --type command_confirm
 ```
 
 设置、报表与巡检：
 
 ```bash
-python3 scripts/jumpserver_api/jms_diagnose.py settings-category --category security_auth --id <setting-id>
-python3 scripts/jumpserver_api/jms_diagnose.py license-detail
-python3 scripts/jumpserver_api/jms_diagnose.py reports --report-type account-statistic --days 30
-python3 scripts/jumpserver_api/jms_diagnose.py reports --report-type pam-dashboard --total-long-time-no-login-accounts --total-weak-password-accounts
-python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability hot-assets-ranking --days 30 --top 10
-python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability system-settings-overview
+python3 jumpserver-governance-inspection/scripts/jms_diagnose.py settings-category --category security_auth --id <setting-id>
+python3 jumpserver-governance-inspection/scripts/jms_diagnose.py license-detail
+python3 jumpserver-governance-inspection/scripts/jms_diagnose.py reports --report-type account-statistic --days 30
+python3 jumpserver-governance-inspection/scripts/jms_diagnose.py reports --report-type pam-dashboard --total-long-time-no-login-accounts --total-weak-password-accounts
+python3 jumpserver-governance-inspection/scripts/jms_diagnose.py inspect --capability hot-assets-ranking --days 30 --top 10
+python3 jumpserver-governance-inspection/scripts/jms_diagnose.py inspect --capability system-settings-overview
 ```
 
 列表型和分析型命令默认会自动翻页，抓取并返回查询范围内的全部结果，不再支持 `--limit/--offset`。
@@ -122,7 +122,7 @@ python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability system-setti
 端点验证：
 
 ```bash
-python3 scripts/jumpserver_api/jms_diagnose.py endpoint-inventory --refresh
-python3 scripts/jumpserver_api/jms_diagnose.py endpoint-verify --path /api/v1/settings/setting/ --method GET
-python3 scripts/jumpserver_api/jms_diagnose.py capabilities
+python3 jumpserver-runtime-setup/scripts/jms_diagnose.py endpoint-inventory --refresh
+python3 jumpserver-runtime-setup/scripts/jms_diagnose.py endpoint-verify --path /api/v1/settings/setting/ --method GET
+python3 jumpserver-governance-inspection/scripts/jms_diagnose.py capabilities
 ```

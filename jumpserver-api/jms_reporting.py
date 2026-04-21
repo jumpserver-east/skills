@@ -20,7 +20,7 @@ except ImportError:  # pragma: no cover
         ZoneInfo = None  # type: ignore[assignment]
         ZoneInfoNotFoundError = None  # type: ignore[assignment]
 
-from .jms_analytics import (
+from jms_analytics import (
     _extract_account,
     _extract_asset,
     _extract_datetime,
@@ -43,7 +43,7 @@ from .jms_analytics import (
     resolve_command_storage_context,
     suspicious_operation_summary,
 )
-from .jms_runtime import (
+from jms_runtime import (
     CLIError,
     GLOBAL_ORG_ID,
     build_cli_guidance_payload,
@@ -52,9 +52,11 @@ from .jms_runtime import (
 )
 
 
-SKILL_DIR = Path(__file__).resolve().parents[2]
-REPORT_TEMPLATE_PATH = SKILL_DIR / "template" / "bastion-daily-usage-template.html"
-REPORT_METADATA_PATH = SKILL_DIR / "references" / "metadata" / "daily_usage_report_template_fields.json"
+JUMPSERVER_API_DIR = Path(__file__).resolve().parent
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SKILL_DIR = REPO_ROOT
+REPORT_TEMPLATE_PATH = REPO_ROOT / "template" / "bastion-daily-usage-template.html"
+REPORT_METADATA_PATH = REPO_ROOT / "references" / "metadata" / "daily_usage_report_template_fields.json"
 PLACEHOLDER_RE = re.compile(r"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}")
 DATE_COMPACT_RE = re.compile(r"^(?P<year>\d{4})(?P<month>\d{2})(?P<day>\d{2})$")
 DATE_CN_RE = re.compile(r"^(?:(?P<year>\d{4})\s*年)?\s*(?P<month>\d{1,2})\s*月\s*(?P<day>\d{1,2})\s*[日号]$")
@@ -185,7 +187,7 @@ def _normalize_report_org_context(org_id: str | None, org_name: str | None = Non
             payload=build_cli_guidance_payload(
                 REPORT_ORG_SELECTION_REASON_CODE,
                 user_message="当前账号下找不到你指定的报告组织，请先确认可访问组织范围。",
-                action_hint="可以先执行 `python3 scripts/jumpserver_api/jms_diagnose.py ping` 查看 `candidate_orgs`，再改用精确的 `--org-id` 或 `--org-name`。",
+                action_hint="可以先执行 `python3 jumpserver-runtime-setup/scripts/jms_diagnose.py ping` 查看 `candidate_orgs`，再改用精确的 `--org-id` 或 `--org-name`。",
                 org_id=requested_org_id or None,
                 org_name=requested_org_name or None,
                 candidate_orgs=accessible_orgs,
@@ -289,9 +291,9 @@ def _normalize_time_window(
                 user_message="`daily-usage` 只能三选一：`--date`、`--period`、或 `--date-from + --date-to`。",
                 action_hint="请只保留一种时间写法后重试。",
                 suggested_commands=[
-                    "python3 scripts/jumpserver_api/jms_report.py daily-usage --date 20260310",
-                    "python3 scripts/jumpserver_api/jms_report.py daily-usage --period 上周",
-                    "python3 scripts/jumpserver_api/jms_report.py daily-usage --date-from '2026-03-10 00:00:00' --date-to '2026-03-24 23:59:59'",
+                    "python3 jumpserver-usage-reporting/scripts/jms_report.py daily-usage --date 20260310",
+                    "python3 jumpserver-usage-reporting/scripts/jms_report.py daily-usage --period 上周",
+                    "python3 jumpserver-usage-reporting/scripts/jms_report.py daily-usage --date-from '2026-03-10 00:00:00' --date-to '2026-03-24 23:59:59'",
                 ],
             ),
         )
@@ -305,7 +307,7 @@ def _normalize_time_window(
                     user_message="显式时间范围必须同时提供 `--date-from` 和 `--date-to`。",
                     action_hint="请把开始时间和结束时间成对传入。",
                     suggested_commands=[
-                        "python3 scripts/jumpserver_api/jms_report.py daily-usage --date-from '2026-03-10 00:00:00' --date-to '2026-03-24 23:59:59'",
+                        "python3 jumpserver-usage-reporting/scripts/jms_report.py daily-usage --date-from '2026-03-10 00:00:00' --date-to '2026-03-24 23:59:59'",
                     ],
                 ),
             )
@@ -878,9 +880,9 @@ def _collect_source_payloads(
             return cache[source_key]
         if source_key == "runtime":
             payload = dict(runtime_context)
-        elif source_key == "entrypoint:python3 scripts/jumpserver_api/jms_diagnose.py license-detail":
+        elif source_key == "entrypoint:python3 jumpserver-governance-inspection/scripts/jms_diagnose.py license-detail":
             payload = _normalize_license_source()
-        elif source_key == "entrypoint:python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type login":
+        elif source_key == "entrypoint:python3 jumpserver-audit-investigation/scripts/jms_query.py audit-list --audit-type login":
             payload = _normalize_login_source(filters)
         elif source_key == "capability:session-record-query":
             payload = _normalize_session_source(filters)
@@ -914,7 +916,7 @@ def _collect_source_payloads(
         elif source_key == "capability:suspicious-operation-summary":
             payload = _normalize_suspicious_source(filters)
         elif source_key == "capability:failed-login-statistics":
-            login_payload = fetch("entrypoint:python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type login")
+            login_payload = fetch("entrypoint:python3 jumpserver-audit-investigation/scripts/jms_query.py audit-list --audit-type login")
             payload = {
                 "login_failed": login_payload.get("login_failed"),
                 "rows_html": login_payload.get("login_failed_rows"),
@@ -1279,7 +1281,7 @@ def _validate_report_output(
         if not value:
             failures.append("Key field %s is empty." % key)
 
-    login_payload = source_payloads.get("entrypoint:python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type login", {})
+    login_payload = source_payloads.get("entrypoint:python3 jumpserver-audit-investigation/scripts/jms_query.py audit-list --audit-type login", {})
     session_payload = source_payloads.get("capability:session-record-query", {})
     risk_payload = source_payloads.get("capability:suspicious-operation-summary", {})
     for field_name, source_total in (

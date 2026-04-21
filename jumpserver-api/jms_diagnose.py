@@ -5,16 +5,16 @@ if __package__ in {None, ""}:
     import sys
     from pathlib import Path
 
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from jumpserver_api.jms_bootstrap import ensure_requirements_installed
+from jms_bootstrap import ensure_requirements_installed
 
 ensure_requirements_installed()
 
 import argparse
 import sys
 
-from jumpserver_api.jms_analytics import (
+from jms_analytics import (
     _apply_common_filters,
     _asset_filter_evidence,
     _exact_first_filter,
@@ -42,8 +42,8 @@ from jumpserver_api.jms_analytics import (
     match_permission_to_asset,
     run_capability,
 )
-from jumpserver_api.jms_capabilities import CAPABILITIES
-from jumpserver_api.jms_runtime import (
+from jms_capabilities import CAPABILITIES
+from jms_runtime import (
     build_org_selection_required_payload,
     CLIError,
     CLIHelpFormatter,
@@ -65,6 +65,7 @@ from jumpserver_api.jms_runtime import (
     resolve_effective_org_context,
     resolve_platform_reference,
     reject_deprecated_pagination_cli_args,
+    rewrite_entrypoint_commands,
     run_and_print,
     user_profile,
     write_local_env_config,
@@ -77,22 +78,118 @@ MISSING_ENDPOINT_PATH_REASON_CODE = "missing_endpoint_path"
 UNSUPPORTED_VERIFICATION_METHOD_REASON_CODE = "unsupported_verification_method"
 
 SELECT_ORG_EXAMPLES = [
-    "python3 scripts/jumpserver_api/jms_diagnose.py select-org",
-    "python3 scripts/jumpserver_api/jms_diagnose.py select-org --org-name Default",
+    "python3 jumpserver-runtime-setup/scripts/jms_diagnose.py select-org",
+    "python3 jumpserver-runtime-setup/scripts/jms_diagnose.py select-org --org-name Default",
 ]
 RECENT_AUDIT_EXAMPLES = [
-    "python3 scripts/jumpserver_api/jms_diagnose.py recent-audit --audit-type login --days 30 --username 示例用户(example.user)",
-    "python3 scripts/jumpserver_api/jms_diagnose.py recent-audit --audit-type login --days 30 --username 示例用户(example.user) --status 1",
-    "python3 scripts/jumpserver_api/jms_diagnose.py recent-audit --audit-type session --user example.user --date-from '2026-03-23 00:00:00' --date-to '2026-03-23 23:59:59' --protocol ssh",
-    "python3 scripts/jumpserver_api/jms_diagnose.py recent-audit --audit-type operate --days 30 --user example.user --action 创建 --resource-type 'User session'",
+    "python3 jumpserver-runtime-setup/scripts/jms_diagnose.py recent-audit --audit-type login --days 30 --username 示例用户(example.user)",
+    "python3 jumpserver-runtime-setup/scripts/jms_diagnose.py recent-audit --audit-type login --days 30 --username 示例用户(example.user) --status 1",
+    "python3 jumpserver-runtime-setup/scripts/jms_diagnose.py recent-audit --audit-type session --user example.user --date-from '2026-03-23 00:00:00' --date-to '2026-03-23 23:59:59' --protocol ssh",
+    "python3 jumpserver-runtime-setup/scripts/jms_diagnose.py recent-audit --audit-type operate --days 30 --user example.user --action 创建 --resource-type 'User session'",
 ]
 REPORTS_EXAMPLES = [
-    "python3 scripts/jumpserver_api/jms_diagnose.py reports --report-type account-statistic --days 30",
+    "python3 jumpserver-runtime-setup/scripts/jms_diagnose.py reports --report-type account-statistic --days 30",
 ]
 INSPECT_EXAMPLES = [
-    "python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability hot-assets-ranking --days 30 --top 10",
-    "python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability system-settings-overview",
+    "python3 jumpserver-runtime-setup/scripts/jms_diagnose.py inspect --capability hot-assets-ranking --days 30 --top 10",
+    "python3 jumpserver-runtime-setup/scripts/jms_diagnose.py inspect --capability system-settings-overview",
 ]
+DIAGNOSE_COMMAND_EXAMPLES = {
+    "select-org": SELECT_ORG_EXAMPLES,
+    "recent-audit": RECENT_AUDIT_EXAMPLES,
+    "reports": REPORTS_EXAMPLES,
+    "inspect": INSPECT_EXAMPLES,
+}
+DIAGNOSE_PROFILE_SETTINGS = {
+    "all": {
+        "description": "JumpServer 诊断、访问分析与系统巡检入口。",
+        "commands": {
+            "config-status",
+            "config-write",
+            "ping",
+            "select-org",
+            "resolve",
+            "resolve-platform",
+            "user-assets",
+            "user-nodes",
+            "user-asset-access",
+            "asset-permission-explain",
+            "recent-audit",
+            "settings-category",
+            "license-detail",
+            "tickets",
+            "command-storages",
+            "replay-storages",
+            "terminals",
+            "reports",
+            "account-automations",
+            "endpoint-inventory",
+            "endpoint-verify",
+            "inspect",
+            "capabilities",
+        },
+    },
+    "runtime-setup": {
+        "description": "JumpServer 运行时预检与配置入口。",
+        "commands": {
+            "config-status",
+            "config-write",
+            "ping",
+            "select-org",
+            "resolve",
+            "resolve-platform",
+            "endpoint-inventory",
+            "endpoint-verify",
+        },
+    },
+    "effective-access": {
+        "description": "JumpServer 有效访问范围分析入口。",
+        "commands": {"user-assets", "user-nodes", "user-asset-access"},
+    },
+    "permission-analysis": {
+        "description": "JumpServer 权限命中解释入口。",
+        "commands": {"asset-permission-explain"},
+    },
+    "audit-investigation": {
+        "description": "JumpServer 快速审计调查入口。",
+        "commands": {"recent-audit"},
+    },
+    "governance-inspection": {
+        "description": "JumpServer 治理巡检与系统检查入口。",
+        "commands": {
+            "settings-category",
+            "license-detail",
+            "tickets",
+            "command-storages",
+            "replay-storages",
+            "terminals",
+            "reports",
+            "account-automations",
+            "inspect",
+            "capabilities",
+        },
+    },
+}
+DIAGNOSE_COMMON_EPILOG = (
+    "推荐路径:\n"
+    "  1. 预检先用 config-status 与 ping\n"
+    "  2. 组织切换优先用 select-org --org-name/--org-id\n"
+    "  3. 高级补充筛选优先用重复的 --filter key=value"
+)
+
+
+def _diagnose_usage_examples(command: str) -> list[str]:
+    return rewrite_entrypoint_commands(DIAGNOSE_COMMAND_EXAMPLES.get(command, []), "jms_diagnose.py")
+
+
+def _diagnose_profile_settings(profile: str) -> dict[str, object]:
+    return DIAGNOSE_PROFILE_SETTINGS.get(profile, DIAGNOSE_PROFILE_SETTINGS["all"])
+
+
+def _diagnose_profile_commands(profile: str) -> set[str]:
+    return set(_diagnose_profile_settings(profile)["commands"])
+
+
 RECENT_AUDIT_STRATEGY_FIELDS = {
     "operate": (
         ("user", "server_user_exact"),
@@ -132,7 +229,7 @@ def _config_write(args: argparse.Namespace):
         args.payload,
         source="--payload",
         usage_examples=[
-            "python3 scripts/jumpserver_api/jms_diagnose.py config-write --payload '{\"JMS_API_URL\": \"https://jump.example.com\"}' --confirm",
+            "python3 jumpserver-runtime-setup/scripts/jms_diagnose.py config-write --payload '{\"JMS_API_URL\": \"https://jump.example.com\"}' --confirm",
         ],
     )
     return write_local_env_config(payload)
@@ -272,7 +369,7 @@ def _select_org(args: argparse.Namespace):
     if not args.confirm:
         return {
             "selection_required": False,
-            "next_step": "python3 scripts/jumpserver_api/jms_diagnose.py select-org --org-id %s --confirm" % selected_org_id,
+            "next_step": "python3 jumpserver-runtime-setup/scripts/jms_diagnose.py select-org --org-id %s --confirm" % selected_org_id,
             **org_context_output(preview_context),
         }
     require_confirmation(args)
@@ -303,8 +400,8 @@ def _resolve(args: argparse.Namespace):
         explicit_fields=("name", "search"),
         forbidden_fields=("limit", "offset"),
         usage_examples=[
-            "python3 scripts/jumpserver_api/jms_diagnose.py resolve --resource organization --name Default",
-            "python3 scripts/jumpserver_api/jms_diagnose.py resolve --resource user --name example.user",
+            "python3 jumpserver-runtime-setup/scripts/jms_diagnose.py resolve --resource organization --name Default",
+            "python3 jumpserver-runtime-setup/scripts/jms_diagnose.py resolve --resource user --name example.user",
         ],
     )
     if args.resource == "asset":
@@ -571,7 +668,7 @@ def _user_asset_access(args: argparse.Namespace):
     _validate_user_selector(args)
     _validate_asset_selector(args)
     _validate_org_override_selector(args)
-    from jumpserver_api.jms_analytics import _list_permissions
+    from jms_analytics import _list_permissions
 
     query_scope = _resolve_command_query_scope(args)
     client = query_scope["client"]
@@ -694,7 +791,7 @@ def _recent_audit(args: argparse.Namespace):
                 "command_storage_scope",
             ),
             forbidden_fields=("limit", "offset"),
-            usage_examples=RECENT_AUDIT_EXAMPLES,
+            usage_examples=_diagnose_usage_examples("recent-audit"),
         ),
         default_days=7,
     )
@@ -749,7 +846,7 @@ def _recent_audit(args: argparse.Namespace):
         **org_context_output(context),
     }
     if args.audit_type == "command":
-        from jumpserver_api.jms_analytics import resolve_command_storage_context
+        from jms_analytics import resolve_command_storage_context
 
         result.update(resolve_command_storage_context(filters))
     return result
@@ -761,9 +858,10 @@ def _settings_category(args: argparse.Namespace):
         args,
         default={"category": args.category},
         explicit_fields=("category", "id"),
-        usage_examples=[
-            "python3 scripts/jumpserver_api/jms_diagnose.py settings-category --category security_auth",
-        ],
+        usage_examples=rewrite_entrypoint_commands(
+            ["python3 jumpserver-governance-inspection/scripts/jms_diagnose.py settings-category --category security_auth"],
+            "jms_diagnose.py",
+        ),
     )
     return run_capability("setting-category-query", filters)
 
@@ -780,9 +878,10 @@ def _tickets(args: argparse.Namespace):
         args,
         explicit_fields=("search", "applicant_username_name", "state", "type"),
         forbidden_fields=("limit", "offset"),
-        usage_examples=[
-            "python3 scripts/jumpserver_api/jms_diagnose.py tickets --applicant example.user --state closed --type command_confirm",
-        ],
+        usage_examples=rewrite_entrypoint_commands(
+            ["python3 jumpserver-governance-inspection/scripts/jms_diagnose.py tickets --applicant example.user --state closed --type command_confirm"],
+            "jms_diagnose.py",
+        ),
         ),
     )
     return run_capability("ticket-list-query", filters)
@@ -794,9 +893,10 @@ def _command_storages(args: argparse.Namespace):
         args,
         explicit_fields=("name", "search"),
         forbidden_fields=("limit", "offset"),
-        usage_examples=[
-            "python3 scripts/jumpserver_api/jms_diagnose.py command-storages --search default",
-        ],
+        usage_examples=rewrite_entrypoint_commands(
+            ["python3 jumpserver-governance-inspection/scripts/jms_diagnose.py command-storages --search default"],
+            "jms_diagnose.py",
+        ),
     )
     return run_capability("command-storage-query", filters)
 
@@ -807,9 +907,10 @@ def _replay_storages(args: argparse.Namespace):
         args,
         explicit_fields=("name", "search"),
         forbidden_fields=("limit", "offset"),
-        usage_examples=[
-            "python3 scripts/jumpserver_api/jms_diagnose.py replay-storages --search default",
-        ],
+        usage_examples=rewrite_entrypoint_commands(
+            ["python3 jumpserver-governance-inspection/scripts/jms_diagnose.py replay-storages --search default"],
+            "jms_diagnose.py",
+        ),
     )
     return run_capability("replay-storage-query", filters)
 
@@ -820,9 +921,10 @@ def _terminals(args: argparse.Namespace):
         args,
         explicit_fields=("name", "search"),
         forbidden_fields=("limit", "offset"),
-        usage_examples=[
-            "python3 scripts/jumpserver_api/jms_diagnose.py terminals --search koko",
-        ],
+        usage_examples=rewrite_entrypoint_commands(
+            ["python3 jumpserver-governance-inspection/scripts/jms_diagnose.py terminals --search koko"],
+            "jms_diagnose.py",
+        ),
     )
     return run_capability("terminal-component-query", filters)
 
@@ -852,7 +954,7 @@ def _reports(args: argparse.Namespace):
             "total_repeated_password_accounts",
         ),
         forbidden_fields=("limit", "offset"),
-        usage_examples=REPORTS_EXAMPLES,
+        usage_examples=_diagnose_usage_examples("reports"),
     )
     return run_capability("report-query", filters)
 
@@ -863,9 +965,10 @@ def _account_automations(args: argparse.Namespace):
         args,
         explicit_fields=("days", "date_from", "date_to", "top", "search"),
         forbidden_fields=("limit", "offset"),
-        usage_examples=[
-            "python3 scripts/jumpserver_api/jms_diagnose.py account-automations --days 30",
-        ],
+        usage_examples=rewrite_entrypoint_commands(
+            ["python3 jumpserver-governance-inspection/scripts/jms_diagnose.py account-automations --days 30"],
+            "jms_diagnose.py",
+        ),
     )
     return run_capability("account-automation-overview", filters)
 
@@ -882,7 +985,7 @@ def _endpoint_verify(args: argparse.Namespace):
     filters = merge_filter_args(
         args,
         usage_examples=[
-            "python3 scripts/jumpserver_api/jms_diagnose.py endpoint-verify --path /api/v1/settings/setting/ --method GET",
+            "python3 jumpserver-runtime-setup/scripts/jms_diagnose.py endpoint-verify --path /api/v1/settings/setting/ --method GET",
         ],
     )
     path = str(args.path or filters.get("path") or "").strip()
@@ -894,7 +997,7 @@ def _endpoint_verify(args: argparse.Namespace):
                 user_message="请通过 `--path` 指定要验证的 API 路径。",
                 action_hint="例如 `--path /api/v1/settings/setting/`；只有兼容旧命令时才建议放进 `--filters`。",
                 suggested_commands=[
-                    "python3 scripts/jumpserver_api/jms_diagnose.py endpoint-verify --path /api/v1/settings/setting/ --method GET",
+                    "python3 jumpserver-runtime-setup/scripts/jms_diagnose.py endpoint-verify --path /api/v1/settings/setting/ --method GET",
                 ],
             ),
         )
@@ -912,7 +1015,7 @@ def _endpoint_verify(args: argparse.Namespace):
                 user_message="`endpoint-verify` 目前只支持 `GET` 和 `OPTIONS`。",
                 action_hint="请把 `--method` 改成 `GET` 或 `OPTIONS`。",
                 suggested_commands=[
-                    "python3 scripts/jumpserver_api/jms_diagnose.py endpoint-verify --path /api/v1/settings/setting/ --method GET",
+                    "python3 jumpserver-runtime-setup/scripts/jms_diagnose.py endpoint-verify --path /api/v1/settings/setting/ --method GET",
                 ],
                 method=method,
             ),
@@ -939,7 +1042,7 @@ def _inspect(args: argparse.Namespace):
             "protocol",
         ),
         forbidden_fields=("limit", "offset"),
-        usage_examples=INSPECT_EXAMPLES,
+        usage_examples=_diagnose_usage_examples("inspect"),
     )
     return run_capability(args.capability, filters)
 
@@ -963,390 +1066,412 @@ def _add_optional_org_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--org-name")
 
 
-def build_parser() -> argparse.ArgumentParser:
+def build_parser(profile: str = "all") -> argparse.ArgumentParser:
+    profile_settings = _diagnose_profile_settings(profile)
+    enabled_commands = set(profile_settings["commands"])
     parser = argparse.ArgumentParser(
-        description="JumpServer 诊断、访问分析与系统巡检入口。",
-        epilog=(
-            "推荐路径:\n"
-            "  1. 预检先用 config-status 与 ping\n"
-            "  2. 组织切换优先用 select-org --org-name/--org-id\n"
-            "  3. 高级补充筛选优先用重复的 --filter key=value"
-        ),
+        description=str(profile_settings["description"]),
+        epilog=DIAGNOSE_COMMON_EPILOG,
         formatter_class=CLIHelpFormatter,
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    config_status_parser = subparsers.add_parser(
-        "config-status",
-        help="查看本地运行时配置状态。",
-        description="检查 .env 是否完整，以及当前鉴权模式和非敏感配置。",
-        formatter_class=CLIHelpFormatter,
-    )
-    config_status_parser.add_argument("--json", action="store_true")
-    config_status_parser.set_defaults(func=_config_status)
+    if "config-status" in enabled_commands:
+        config_status_parser = subparsers.add_parser(
+            "config-status",
+            help="查看本地运行时配置状态。",
+            description="检查 .env 是否完整，以及当前鉴权模式和非敏感配置。",
+            formatter_class=CLIHelpFormatter,
+        )
+        config_status_parser.add_argument("--json", action="store_true")
+        config_status_parser.set_defaults(func=_config_status)
 
-    config_write_parser = subparsers.add_parser(
-        "config-write",
-        help="写入本地 .env 配置。",
-        description="把准备好的运行时配置写回本地 .env；执行前必须加 --confirm。",
-        formatter_class=CLIHelpFormatter,
-    )
-    config_write_parser.add_argument("--payload", required=True)
-    config_write_parser.add_argument("--confirm", action="store_true")
-    config_write_parser.set_defaults(func=_config_write)
+    if "config-write" in enabled_commands:
+        config_write_parser = subparsers.add_parser(
+            "config-write",
+            help="写入本地 .env 配置。",
+            description="把准备好的运行时配置写回本地 .env；执行前必须加 --confirm。",
+            formatter_class=CLIHelpFormatter,
+        )
+        config_write_parser.add_argument("--payload", required=True)
+        config_write_parser.add_argument("--confirm", action="store_true")
+        config_write_parser.set_defaults(func=_config_write)
 
-    ping_parser = subparsers.add_parser(
-        "ping",
-        help="检查连通性、当前用户和组织上下文。",
-        description="验证 JumpServer 可连接，并回显当前用户、当前组织和可切换组织。",
-        formatter_class=CLIHelpFormatter,
-    )
-    ping_parser.set_defaults(func=_ping)
+    if "ping" in enabled_commands:
+        ping_parser = subparsers.add_parser(
+            "ping",
+            help="检查连通性、当前用户和组织上下文。",
+            description="验证 JumpServer 可连接，并回显当前用户、当前组织和可切换组织。",
+            formatter_class=CLIHelpFormatter,
+        )
+        ping_parser.set_defaults(func=_ping)
 
-    select_org_parser = subparsers.add_parser(
-        "select-org",
-        help="预览或切换当前组织。",
-        description="不带参数时查看当前组织上下文；带 `--org-id` 或 `--org-name` 时预览切换结果，追加 `--confirm` 才会写回本地配置。",
-        epilog="Examples:\n  " + "\n  ".join(SELECT_ORG_EXAMPLES),
-        formatter_class=CLIHelpFormatter,
-    )
-    select_org_parser.add_argument("--org-id")
-    select_org_parser.add_argument("--org-name")
-    select_org_parser.add_argument("--confirm", action="store_true")
-    select_org_parser.set_defaults(func=_select_org)
+    if "select-org" in enabled_commands:
+        select_org_parser = subparsers.add_parser(
+            "select-org",
+            help="预览或切换当前组织。",
+            description="不带参数时查看当前组织上下文；带 `--org-id` 或 `--org-name` 时预览切换结果，追加 `--confirm` 才会写回本地配置。",
+            epilog="Examples:\n  " + "\n  ".join(_diagnose_usage_examples("select-org")),
+            formatter_class=CLIHelpFormatter,
+        )
+        select_org_parser.add_argument("--org-id")
+        select_org_parser.add_argument("--org-name")
+        select_org_parser.add_argument("--confirm", action="store_true")
+        select_org_parser.set_defaults(func=_select_org)
 
-    resolve_parser = subparsers.add_parser(
-        "resolve",
-        help="把自然语言对象名解析成精确对象。",
-        description="用于资产、节点、用户、组织、平台等对象的精确解析。",
-        formatter_class=CLIHelpFormatter,
-    )
-    resolve_parser.add_argument("--resource", required=True, choices=["asset", "node", "user", "user-group", "organization", "account", "platform", "permission"])
-    resolve_parser.add_argument("--id")
-    resolve_parser.add_argument("--name")
-    resolve_parser.add_argument("--search", help="服务端搜索关键字。")
-    add_filter_arguments(resolve_parser)
-    resolve_parser.set_defaults(func=_resolve)
+    if "resolve" in enabled_commands:
+        resolve_parser = subparsers.add_parser(
+            "resolve",
+            help="把自然语言对象名解析成精确对象。",
+            description="用于资产、节点、用户、组织、平台等对象的精确解析。",
+            formatter_class=CLIHelpFormatter,
+        )
+        resolve_parser.add_argument("--resource", required=True, choices=["asset", "node", "user", "user-group", "organization", "account", "platform", "permission"])
+        resolve_parser.add_argument("--id")
+        resolve_parser.add_argument("--name")
+        resolve_parser.add_argument("--search", help="服务端搜索关键字。")
+        add_filter_arguments(resolve_parser)
+        resolve_parser.set_defaults(func=_resolve)
 
-    resolve_platform_parser = subparsers.add_parser(
-        "resolve-platform",
-        help="解析平台名称或分类。",
-        description="把平台名、slug 或 category 解析成平台对象。",
-        formatter_class=CLIHelpFormatter,
-    )
-    resolve_platform_parser.add_argument("--value", required=True)
-    resolve_platform_parser.set_defaults(func=_resolve_platform)
+    if "resolve-platform" in enabled_commands:
+        resolve_platform_parser = subparsers.add_parser(
+            "resolve-platform",
+            help="解析平台名称或分类。",
+            description="把平台名、slug 或 category 解析成平台对象。",
+            formatter_class=CLIHelpFormatter,
+        )
+        resolve_platform_parser.add_argument("--value", required=True)
+        resolve_platform_parser.set_defaults(func=_resolve_platform)
 
-    user_assets_parser = subparsers.add_parser(
-        "user-assets",
-        help="查询用户当前可访问资产。",
-        description="读取 JumpServer effective access 接口，返回用户在指定组织下当前可访问的资产。",
-        formatter_class=CLIHelpFormatter,
-    )
-    user_assets_parser.add_argument("--user-id")
-    user_assets_parser.add_argument("--username", "--user-name", dest="username")
-    _add_optional_org_arguments(user_assets_parser)
-    user_assets_parser.set_defaults(func=_user_assets)
+    if "user-assets" in enabled_commands:
+        user_assets_parser = subparsers.add_parser(
+            "user-assets",
+            help="查询用户当前可访问资产。",
+            description="读取 JumpServer effective access 接口，返回用户在指定组织下当前可访问的资产。",
+            formatter_class=CLIHelpFormatter,
+        )
+        user_assets_parser.add_argument("--user-id")
+        user_assets_parser.add_argument("--username", "--user-name", dest="username")
+        _add_optional_org_arguments(user_assets_parser)
+        user_assets_parser.set_defaults(func=_user_assets)
 
-    user_nodes_parser = subparsers.add_parser(
-        "user-nodes",
-        help="查询用户当前可访问节点。",
-        description="读取 JumpServer effective access 接口，返回用户在指定组织下当前可访问的节点。",
-        formatter_class=CLIHelpFormatter,
-    )
-    user_nodes_parser.add_argument("--user-id")
-    user_nodes_parser.add_argument("--username", "--user-name", dest="username")
-    _add_optional_org_arguments(user_nodes_parser)
-    user_nodes_parser.set_defaults(func=_user_nodes)
+    if "user-nodes" in enabled_commands:
+        user_nodes_parser = subparsers.add_parser(
+            "user-nodes",
+            help="查询用户当前可访问节点。",
+            description="读取 JumpServer effective access 接口，返回用户在指定组织下当前可访问的节点。",
+            formatter_class=CLIHelpFormatter,
+        )
+        user_nodes_parser.add_argument("--user-id")
+        user_nodes_parser.add_argument("--username", "--user-name", dest="username")
+        _add_optional_org_arguments(user_nodes_parser)
+        user_nodes_parser.set_defaults(func=_user_nodes)
 
-    user_asset_access_parser = subparsers.add_parser(
-        "user-asset-access",
-        help="查询用户在某资产下可用的账号和协议。",
-        description="从用户和资产两个维度读取有效访问范围，返回账号和协议集合。",
-        formatter_class=CLIHelpFormatter,
-    )
-    user_asset_access_parser.add_argument("--user-id")
-    user_asset_access_parser.add_argument("--username", "--user-name", dest="username")
-    user_asset_access_parser.add_argument("--asset-id")
-    user_asset_access_parser.add_argument("--asset-name")
-    _add_optional_org_arguments(user_asset_access_parser)
-    user_asset_access_parser.set_defaults(func=_user_asset_access)
+    if "user-asset-access" in enabled_commands:
+        user_asset_access_parser = subparsers.add_parser(
+            "user-asset-access",
+            help="查询用户在某资产下可用的账号和协议。",
+            description="从用户和资产两个维度读取有效访问范围，返回账号和协议集合。",
+            formatter_class=CLIHelpFormatter,
+        )
+        user_asset_access_parser.add_argument("--user-id")
+        user_asset_access_parser.add_argument("--username", "--user-name", dest="username")
+        user_asset_access_parser.add_argument("--asset-id")
+        user_asset_access_parser.add_argument("--asset-name")
+        _add_optional_org_arguments(user_asset_access_parser)
+        user_asset_access_parser.set_defaults(func=_user_asset_access)
 
-    asset_permission_explain_parser = subparsers.add_parser(
-        "asset-permission-explain",
-        help="解释某资产命中的权限规则。",
-        description="从资产视角解释直接资产、标签和节点继承命中的授权规则。",
-        formatter_class=CLIHelpFormatter,
-    )
-    asset_permission_explain_parser.add_argument("--asset-id")
-    asset_permission_explain_parser.add_argument("--asset-name")
-    _add_optional_org_arguments(asset_permission_explain_parser)
-    asset_permission_explain_parser.set_defaults(func=_asset_permission_explain)
+    if "asset-permission-explain" in enabled_commands:
+        asset_permission_explain_parser = subparsers.add_parser(
+            "asset-permission-explain",
+            help="解释某资产命中的权限规则。",
+            description="从资产视角解释直接资产、标签和节点继承命中的授权规则。",
+            formatter_class=CLIHelpFormatter,
+        )
+        asset_permission_explain_parser.add_argument("--asset-id")
+        asset_permission_explain_parser.add_argument("--asset-name")
+        _add_optional_org_arguments(asset_permission_explain_parser)
+        asset_permission_explain_parser.set_defaults(func=_asset_permission_explain)
 
-    recent_audit_parser = subparsers.add_parser(
-        "recent-audit",
-        help="快速查看最近审计。",
-        description="快速读取最近登录、会话、命令或操作审计，参数语义与页面过滤保持一致；未给时间时默认最近 7 天。",
-        epilog="Examples:\n  " + "\n  ".join(RECENT_AUDIT_EXAMPLES),
-        formatter_class=CLIHelpFormatter,
-    )
-    recent_audit_parser.add_argument("--audit-type", required=True, choices=["operate", "login", "session", "command"])
-    _add_page_query_time_arguments(recent_audit_parser)
-    recent_audit_parser.add_argument("--user", help="页面精确用户过滤；用于 operate 和 session，输入用户名或显示名时会解析成页面显示值。")
-    recent_audit_parser.add_argument("--username", help="登录日志页面用户名精确过滤；最终下发 `name(username)`，仅当 audit-type=login 时生效。")
-    recent_audit_parser.add_argument("--ip", help="登录日志页面来源 IP 精确过滤，仅当 audit-type=login 时生效。")
-    recent_audit_parser.add_argument("--type", help="登录日志页面设备类型精确过滤；仅当 audit-type=login 时生效，只支持 `W/T/U`。")
-    recent_audit_parser.add_argument("--city", help="登录日志页面城市精确过滤，仅当 audit-type=login 时生效。")
-    recent_audit_parser.add_argument("--mfa", help="登录日志页面 MFA 状态精确过滤；仅当 audit-type=login 时生效，只支持 `0/1/2`。")
-    recent_audit_parser.add_argument("--status", help="登录日志页面状态精确过滤；仅当 audit-type=login 时生效，只支持 `0/1`；不传时统计该时间窗内的全部登录记录。")
-    recent_audit_parser.add_argument("--asset", help="页面资产精确过滤；仅当 audit-type=session 时生效，输入名称或地址时会解析成 `name(ip)`。")
-    recent_audit_parser.add_argument("--asset-id", dest="asset_id", help="资产 UUID 精确过滤；仅当 audit-type=session 或 command 时生效。")
-    recent_audit_parser.add_argument("--account", help="页面账号精确过滤；仅当 audit-type=session 时生效，输入名称或用户名时会解析成 `name(username)`。")
-    recent_audit_parser.add_argument("--protocol", help="页面协议精确过滤；仅当 audit-type=session 时生效。")
-    recent_audit_parser.add_argument("--login-from", dest="login_from", help="页面登录来源精确过滤；仅当 audit-type=session 时生效，只支持 `WT/ST/RT/DT/VT`。")
-    recent_audit_parser.add_argument("--remote-addr", dest="remote_addr", help="页面远端地址精确过滤；仅当 audit-type=session 时生效。")
-    recent_audit_parser.add_argument("--order", help="页面排序字段；仅当 audit-type=session 或 command 时生效。")
-    recent_audit_parser.add_argument("--command-storage-id", dest="command_storage_id", help="命令记录页面指定 command storage ID，仅当 audit-type=command 时生效。")
-    recent_audit_parser.add_argument(
-        "--command-storage-scope",
-        dest="command_storage_scope",
-        choices=["all"],
-        help="命令记录页面设为 `all` 时汇总全部可访问 command storage，仅当 audit-type=command 时生效。",
-    )
-    recent_audit_parser.add_argument("--action", help="操作日志页面动作精确过滤；仅当 audit-type=operate 时生效，支持 create/创建 等值。")
-    recent_audit_parser.add_argument("--resource-type", dest="resource_type", help="操作日志页面资源类型精确过滤，仅当 audit-type=operate 时生效。")
-    add_filter_arguments(recent_audit_parser)
-    recent_audit_parser.set_defaults(func=_recent_audit)
+    if "recent-audit" in enabled_commands:
+        recent_audit_parser = subparsers.add_parser(
+            "recent-audit",
+            help="快速查看最近审计。",
+            description="快速读取最近登录、会话、命令或操作审计，参数语义与页面过滤保持一致；未给时间时默认最近 7 天。",
+            epilog="Examples:\n  " + "\n  ".join(_diagnose_usage_examples("recent-audit")),
+            formatter_class=CLIHelpFormatter,
+        )
+        recent_audit_parser.add_argument("--audit-type", required=True, choices=["operate", "login", "session", "command"])
+        _add_page_query_time_arguments(recent_audit_parser)
+        recent_audit_parser.add_argument("--user", help="页面精确用户过滤；用于 operate 和 session，输入用户名或显示名时会解析成页面显示值。")
+        recent_audit_parser.add_argument("--username", help="登录日志页面用户名精确过滤；最终下发 `name(username)`，仅当 audit-type=login 时生效。")
+        recent_audit_parser.add_argument("--ip", help="登录日志页面来源 IP 精确过滤，仅当 audit-type=login 时生效。")
+        recent_audit_parser.add_argument("--type", help="登录日志页面设备类型精确过滤；仅当 audit-type=login 时生效，只支持 `W/T/U`。")
+        recent_audit_parser.add_argument("--city", help="登录日志页面城市精确过滤；仅当 audit-type=login 时生效。")
+        recent_audit_parser.add_argument("--mfa", help="登录日志页面 MFA 状态精确过滤；仅当 audit-type=login 时生效，只支持 `0/1/2`。")
+        recent_audit_parser.add_argument("--status", help="登录日志页面状态精确过滤；仅当 audit-type=login 时生效，只支持 `0/1`；不传时统计该时间窗内的全部登录记录。")
+        recent_audit_parser.add_argument("--asset", help="页面资产精确过滤；仅当 audit-type=session 时生效，输入名称或地址时会解析成 `name(ip)`。")
+        recent_audit_parser.add_argument("--asset-id", dest="asset_id", help="资产 UUID 精确过滤；仅当 audit-type=session 或 command 时生效。")
+        recent_audit_parser.add_argument("--account", help="页面账号精确过滤；仅当 audit-type=session 时生效，输入名称或用户名时会解析成 `name(username)`。")
+        recent_audit_parser.add_argument("--protocol", help="页面协议精确过滤；仅当 audit-type=session 时生效。")
+        recent_audit_parser.add_argument("--login-from", dest="login_from", help="页面登录来源精确过滤；仅当 audit-type=session 时生效，只支持 `WT/ST/RT/DT/VT`。")
+        recent_audit_parser.add_argument("--remote-addr", dest="remote_addr", help="页面远端地址精确过滤；仅当 audit-type=session 时生效。")
+        recent_audit_parser.add_argument("--order", help="页面排序字段；仅当 audit-type=session 或 command 时生效。")
+        recent_audit_parser.add_argument("--command-storage-id", dest="command_storage_id", help="命令记录页面指定 command storage ID，仅当 audit-type=command 时生效。")
+        recent_audit_parser.add_argument(
+            "--command-storage-scope",
+            dest="command_storage_scope",
+            choices=["all"],
+            help="命令记录页面设为 `all` 时汇总全部可访问 command storage，仅当 audit-type=command 时生效。",
+        )
+        recent_audit_parser.add_argument("--action", help="操作日志页面动作精确过滤；仅当 audit-type=operate 时生效，支持 create/创建 等值。")
+        recent_audit_parser.add_argument("--resource-type", dest="resource_type", help="操作日志页面资源类型精确过滤，仅当 audit-type=operate 时生效。")
+        add_filter_arguments(recent_audit_parser)
+        recent_audit_parser.set_defaults(func=_recent_audit)
 
-    settings_category_parser = subparsers.add_parser(
-        "settings-category",
-        help="按分类读取系统设置。",
-        description="根据 settings category 读取系统设置原始结果。",
-        formatter_class=CLIHelpFormatter,
-    )
-    settings_category_parser.add_argument("--category", required=True)
-    settings_category_parser.add_argument("--id", help="页面 settings ID。")
-    add_filter_arguments(settings_category_parser)
-    settings_category_parser.set_defaults(func=_settings_category)
+    if "settings-category" in enabled_commands:
+        settings_category_parser = subparsers.add_parser(
+            "settings-category",
+            help="按分类读取系统设置。",
+            description="根据 settings category 读取系统设置原始结果。",
+            formatter_class=CLIHelpFormatter,
+        )
+        settings_category_parser.add_argument("--category", required=True)
+        settings_category_parser.add_argument("--id", help="页面 settings ID。")
+        add_filter_arguments(settings_category_parser)
+        settings_category_parser.set_defaults(func=_settings_category)
 
-    license_parser = subparsers.add_parser(
-        "license-detail",
-        help="查看许可证详情。",
-        description="读取当前环境下的许可证详情。",
-        formatter_class=CLIHelpFormatter,
-    )
-    license_parser.set_defaults(func=_license_detail)
+    if "license-detail" in enabled_commands:
+        license_parser = subparsers.add_parser(
+            "license-detail",
+            help="查看许可证详情。",
+            description="读取当前环境下的许可证详情。",
+            formatter_class=CLIHelpFormatter,
+        )
+        license_parser.set_defaults(func=_license_detail)
 
-    tickets_parser = subparsers.add_parser(
-        "tickets",
-        help="查看工单列表。",
-        description="查询工单列表，支持页面搜索和申请人/状态/类型精确过滤。",
-        formatter_class=CLIHelpFormatter,
-    )
-    tickets_parser.add_argument("--search", help="页面搜索框的直接搜索关键字。")
-    tickets_parser.add_argument("--applicant", dest="applicant_username_name", help="页面申请人精确过滤；输入用户名或显示名时会解析成申请人显示名。")
-    tickets_parser.add_argument("--state", help="页面审批状态精确过滤；只支持 `closed/pending/approved/rejected/all`。")
-    tickets_parser.add_argument("--type", help="页面工单类型精确过滤；只支持 `apply_asset/login_confirm/command_confirm/login_asset_confirm`。")
-    add_filter_arguments(tickets_parser)
-    tickets_parser.set_defaults(func=_tickets)
+    if "tickets" in enabled_commands:
+        tickets_parser = subparsers.add_parser(
+            "tickets",
+            help="查看工单列表。",
+            description="查询工单列表，支持页面搜索和申请人/状态/类型精确过滤。",
+            formatter_class=CLIHelpFormatter,
+        )
+        tickets_parser.add_argument("--search", help="页面搜索框的直接搜索关键字。")
+        tickets_parser.add_argument("--applicant", dest="applicant_username_name", help="页面申请人精确过滤；输入用户名或显示名时会解析成申请人显示名。")
+        tickets_parser.add_argument("--state", help="页面审批状态精确过滤；只支持 `closed/pending/approved/rejected/all`。")
+        tickets_parser.add_argument("--type", help="页面工单类型精确过滤；只支持 `apply_asset/login_confirm/command_confirm/login_asset_confirm`。")
+        add_filter_arguments(tickets_parser)
+        tickets_parser.set_defaults(func=_tickets)
 
-    command_storages_parser = subparsers.add_parser(
-        "command-storages",
-        help="查看命令存储列表。",
-        description="查询 command storage 列表，默认返回命中的全部结果。",
-        formatter_class=CLIHelpFormatter,
-    )
-    _add_lookup_filter_arguments(command_storages_parser)
-    add_filter_arguments(command_storages_parser)
-    command_storages_parser.set_defaults(func=_command_storages)
+    if "command-storages" in enabled_commands:
+        command_storages_parser = subparsers.add_parser(
+            "command-storages",
+            help="查看命令存储列表。",
+            description="查询 command storage 列表，默认返回命中的全部结果。",
+            formatter_class=CLIHelpFormatter,
+        )
+        _add_lookup_filter_arguments(command_storages_parser)
+        add_filter_arguments(command_storages_parser)
+        command_storages_parser.set_defaults(func=_command_storages)
 
-    replay_storages_parser = subparsers.add_parser(
-        "replay-storages",
-        help="查看录像存储列表。",
-        description="查询 replay storage 列表，默认返回命中的全部结果。",
-        formatter_class=CLIHelpFormatter,
-    )
-    _add_lookup_filter_arguments(replay_storages_parser)
-    add_filter_arguments(replay_storages_parser)
-    replay_storages_parser.set_defaults(func=_replay_storages)
+    if "replay-storages" in enabled_commands:
+        replay_storages_parser = subparsers.add_parser(
+            "replay-storages",
+            help="查看录像存储列表。",
+            description="查询 replay storage 列表，默认返回命中的全部结果。",
+            formatter_class=CLIHelpFormatter,
+        )
+        _add_lookup_filter_arguments(replay_storages_parser)
+        add_filter_arguments(replay_storages_parser)
+        replay_storages_parser.set_defaults(func=_replay_storages)
 
-    terminals_parser = subparsers.add_parser(
-        "terminals",
-        help="查看终端组件列表。",
-        description="查询终端组件列表，默认返回命中的全部结果。",
-        formatter_class=CLIHelpFormatter,
-    )
-    _add_lookup_filter_arguments(terminals_parser)
-    add_filter_arguments(terminals_parser)
-    terminals_parser.set_defaults(func=_terminals)
+    if "terminals" in enabled_commands:
+        terminals_parser = subparsers.add_parser(
+            "terminals",
+            help="查看终端组件列表。",
+            description="查询终端组件列表，默认返回命中的全部结果。",
+            formatter_class=CLIHelpFormatter,
+        )
+        _add_lookup_filter_arguments(terminals_parser)
+        add_filter_arguments(terminals_parser)
+        terminals_parser.set_defaults(func=_terminals)
 
-    reports_parser = subparsers.add_parser(
-        "reports",
-        help="读取系统报表与 dashboard。",
-        description="读取 account / asset 等系统报表，默认返回命中范围内的全部结果。",
-        epilog="Examples:\n  " + "\n  ".join(REPORTS_EXAMPLES),
-        formatter_class=CLIHelpFormatter,
-    )
-    reports_parser.add_argument(
-        "--report-type",
-        required=True,
-        choices=[
-            "account-statistic",
-            "account-automation",
-            "asset-statistic",
-            "asset-activity",
-            "users",
-            "user-change-password",
-            "pam-dashboard",
-            "change-secret-dashboard",
-        ],
-    )
-    _add_time_filter_arguments(reports_parser)
-    reports_parser.add_argument("--top", type=int, help="排行类报表返回前 N 条。")
-    _add_enabled_flag_argument(
-        reports_parser,
-        "--daily-success-and-failure-metrics",
-        dest="daily_success_and_failure_metrics",
-        help_text="change-secret-dashboard 页面指标开关。",
-    )
-    _add_enabled_flag_argument(
-        reports_parser,
-        "--total-long-time-no-login-accounts",
-        dest="total_long_time_no_login_accounts",
-        help_text="pam-dashboard 指标开关。",
-    )
-    _add_enabled_flag_argument(
-        reports_parser,
-        "--total-new-found-accounts",
-        dest="total_new_found_accounts",
-        help_text="pam-dashboard 指标开关。",
-    )
-    _add_enabled_flag_argument(
-        reports_parser,
-        "--total-groups-changed-accounts",
-        dest="total_groups_changed_accounts",
-        help_text="pam-dashboard 指标开关。",
-    )
-    _add_enabled_flag_argument(
-        reports_parser,
-        "--total-sudoers-changed-accounts",
-        dest="total_sudoers_changed_accounts",
-        help_text="pam-dashboard 指标开关。",
-    )
-    _add_enabled_flag_argument(
-        reports_parser,
-        "--total-authorized-keys-changed-accounts",
-        dest="total_authorized_keys_changed_accounts",
-        help_text="pam-dashboard 指标开关。",
-    )
-    _add_enabled_flag_argument(
-        reports_parser,
-        "--total-account-deleted-accounts",
-        dest="total_account_deleted_accounts",
-        help_text="pam-dashboard 指标开关。",
-    )
-    _add_enabled_flag_argument(
-        reports_parser,
-        "--total-password-expired-accounts",
-        dest="total_password_expired_accounts",
-        help_text="pam-dashboard 指标开关。",
-    )
-    _add_enabled_flag_argument(
-        reports_parser,
-        "--total-long-time-password-accounts",
-        dest="total_long_time_password_accounts",
-        help_text="pam-dashboard 指标开关。",
-    )
-    _add_enabled_flag_argument(
-        reports_parser,
-        "--total-weak-password-accounts",
-        dest="total_weak_password_accounts",
-        help_text="pam-dashboard 指标开关。",
-    )
-    _add_enabled_flag_argument(
-        reports_parser,
-        "--total-leaked-password-accounts",
-        dest="total_leaked_password_accounts",
-        help_text="pam-dashboard 指标开关。",
-    )
-    _add_enabled_flag_argument(
-        reports_parser,
-        "--total-repeated-password-accounts",
-        dest="total_repeated_password_accounts",
-        help_text="pam-dashboard 指标开关。",
-    )
-    add_filter_arguments(reports_parser)
-    reports_parser.set_defaults(func=_reports)
+    if "reports" in enabled_commands:
+        reports_parser = subparsers.add_parser(
+            "reports",
+            help="读取系统报表与 dashboard。",
+            description="读取 account / asset 等系统报表，默认返回命中范围内的全部结果。",
+            epilog="Examples:\n  " + "\n  ".join(_diagnose_usage_examples("reports")),
+            formatter_class=CLIHelpFormatter,
+        )
+        reports_parser.add_argument(
+            "--report-type",
+            required=True,
+            choices=[
+                "account-statistic",
+                "account-automation",
+                "asset-statistic",
+                "asset-activity",
+                "users",
+                "user-change-password",
+                "pam-dashboard",
+                "change-secret-dashboard",
+            ],
+        )
+        _add_time_filter_arguments(reports_parser)
+        reports_parser.add_argument("--top", type=int, help="排行类报表返回前 N 条。")
+        _add_enabled_flag_argument(
+            reports_parser,
+            "--daily-success-and-failure-metrics",
+            dest="daily_success_and_failure_metrics",
+            help_text="change-secret-dashboard 页面指标开关。",
+        )
+        _add_enabled_flag_argument(
+            reports_parser,
+            "--total-long-time-no-login-accounts",
+            dest="total_long_time_no_login_accounts",
+            help_text="pam-dashboard 指标开关。",
+        )
+        _add_enabled_flag_argument(
+            reports_parser,
+            "--total-new-found-accounts",
+            dest="total_new_found_accounts",
+            help_text="pam-dashboard 指标开关。",
+        )
+        _add_enabled_flag_argument(
+            reports_parser,
+            "--total-groups-changed-accounts",
+            dest="total_groups_changed_accounts",
+            help_text="pam-dashboard 指标开关。",
+        )
+        _add_enabled_flag_argument(
+            reports_parser,
+            "--total-sudoers-changed-accounts",
+            dest="total_sudoers_changed_accounts",
+            help_text="pam-dashboard 指标开关。",
+        )
+        _add_enabled_flag_argument(
+            reports_parser,
+            "--total-authorized-keys-changed-accounts",
+            dest="total_authorized_keys_changed_accounts",
+            help_text="pam-dashboard 指标开关。",
+        )
+        _add_enabled_flag_argument(
+            reports_parser,
+            "--total-account-deleted-accounts",
+            dest="total_account_deleted_accounts",
+            help_text="pam-dashboard 指标开关。",
+        )
+        _add_enabled_flag_argument(
+            reports_parser,
+            "--total-password-expired-accounts",
+            dest="total_password_expired_accounts",
+            help_text="pam-dashboard 指标开关。",
+        )
+        _add_enabled_flag_argument(
+            reports_parser,
+            "--total-long-time-password-accounts",
+            dest="total_long_time_password_accounts",
+            help_text="pam-dashboard 指标开关。",
+        )
+        _add_enabled_flag_argument(
+            reports_parser,
+            "--total-weak-password-accounts",
+            dest="total_weak_password_accounts",
+            help_text="pam-dashboard 指标开关。",
+        )
+        _add_enabled_flag_argument(
+            reports_parser,
+            "--total-leaked-password-accounts",
+            dest="total_leaked_password_accounts",
+            help_text="pam-dashboard 指标开关。",
+        )
+        _add_enabled_flag_argument(
+            reports_parser,
+            "--total-repeated-password-accounts",
+            dest="total_repeated_password_accounts",
+            help_text="pam-dashboard 指标开关。",
+        )
+        add_filter_arguments(reports_parser)
+        reports_parser.set_defaults(func=_reports)
 
-    account_automations_parser = subparsers.add_parser(
-        "account-automations",
-        help="查看账号自动化与风险概览。",
-        description="查询账号自动化、风险、备份和改密等聚合结果。",
-        formatter_class=CLIHelpFormatter,
-    )
-    _add_time_filter_arguments(account_automations_parser)
-    account_automations_parser.add_argument("--search", help="搜索关键字。")
-    account_automations_parser.add_argument("--top", type=int, help="排行类场景返回前 N 条。")
-    add_filter_arguments(account_automations_parser)
-    account_automations_parser.set_defaults(func=_account_automations)
+    if "account-automations" in enabled_commands:
+        account_automations_parser = subparsers.add_parser(
+            "account-automations",
+            help="查看账号自动化与风险概览。",
+            description="查询账号自动化、风险、备份和改密等聚合结果。",
+            formatter_class=CLIHelpFormatter,
+        )
+        _add_time_filter_arguments(account_automations_parser)
+        account_automations_parser.add_argument("--search", help="搜索关键字。")
+        account_automations_parser.add_argument("--top", type=int, help="排行类场景返回前 N 条。")
+        add_filter_arguments(account_automations_parser)
+        account_automations_parser.set_defaults(func=_account_automations)
 
-    endpoint_inventory_parser = subparsers.add_parser(
-        "endpoint-inventory",
-        help="查看端点 inventory。",
-        description="输出当前环境探测到的核心端点 inventory 与缓存。",
-        formatter_class=CLIHelpFormatter,
-    )
-    endpoint_inventory_parser.add_argument("--refresh", action="store_true")
-    endpoint_inventory_parser.set_defaults(func=_endpoint_inventory)
+    if "endpoint-inventory" in enabled_commands:
+        endpoint_inventory_parser = subparsers.add_parser(
+            "endpoint-inventory",
+            help="查看端点 inventory。",
+            description="输出当前环境探测到的核心端点 inventory 与缓存。",
+            formatter_class=CLIHelpFormatter,
+        )
+        endpoint_inventory_parser.add_argument("--refresh", action="store_true")
+        endpoint_inventory_parser.set_defaults(func=_endpoint_inventory)
 
-    endpoint_verify_parser = subparsers.add_parser(
-        "endpoint-verify",
-        help="验证单个端点的 GET/OPTIONS 能力。",
-        description="对指定 API 路径做只读验证。",
-        formatter_class=CLIHelpFormatter,
-    )
-    endpoint_verify_parser.add_argument("--path")
-    endpoint_verify_parser.add_argument("--method", choices=["GET", "OPTIONS"], default="GET")
-    add_filter_arguments(endpoint_verify_parser)
-    endpoint_verify_parser.set_defaults(func=_endpoint_verify)
+    if "endpoint-verify" in enabled_commands:
+        endpoint_verify_parser = subparsers.add_parser(
+            "endpoint-verify",
+            help="验证单个端点的 GET/OPTIONS 能力。",
+            description="对指定 API 路径做只读验证。",
+            formatter_class=CLIHelpFormatter,
+        )
+        endpoint_verify_parser.add_argument("--path")
+        endpoint_verify_parser.add_argument("--method", choices=["GET", "OPTIONS"], default="GET")
+        add_filter_arguments(endpoint_verify_parser)
+        endpoint_verify_parser.set_defaults(func=_endpoint_verify)
 
-    inspect_parser = subparsers.add_parser(
-        "inspect",
-        help="执行 capability 化治理与巡检。",
-        description="执行治理、巡检、统计类 capability，支持时间范围和常见筛选参数。",
-        epilog="Examples:\n  " + "\n  ".join(INSPECT_EXAMPLES),
-        formatter_class=CLIHelpFormatter,
-    )
-    inspect_parser.add_argument("--capability", required=True)
-    _add_time_filter_arguments(inspect_parser)
-    inspect_parser.add_argument("--search", help="搜索关键字。")
-    inspect_parser.add_argument("--user", help="用户名或显示名。")
-    inspect_parser.add_argument("--user-id", dest="user_id", help="用户 UUID。")
-    inspect_parser.add_argument("--asset", help="资产名称、地址或关键字。")
-    inspect_parser.add_argument("--asset-keywords", dest="asset_keywords", help="敏感资产关键字。")
-    inspect_parser.add_argument("--status", help="状态过滤。")
-    inspect_parser.add_argument("--direction", help="方向过滤，例如 upload / download。")
-    inspect_parser.add_argument("--keyword", help="关键字过滤。")
-    inspect_parser.add_argument("--protocol", help="协议过滤。")
-    inspect_parser.add_argument("--top", type=int, help="排行类场景返回前 N 条。")
-    add_filter_arguments(inspect_parser)
-    inspect_parser.set_defaults(func=_inspect)
+    if "inspect" in enabled_commands:
+        inspect_parser = subparsers.add_parser(
+            "inspect",
+            help="执行 capability 化治理与巡检。",
+            description="执行治理、巡检、统计类 capability，支持时间范围和常见筛选参数。",
+            epilog="Examples:\n  " + "\n  ".join(_diagnose_usage_examples("inspect")),
+            formatter_class=CLIHelpFormatter,
+        )
+        inspect_parser.add_argument("--capability", required=True)
+        _add_time_filter_arguments(inspect_parser)
+        inspect_parser.add_argument("--search", help="搜索关键字。")
+        inspect_parser.add_argument("--user", help="用户名或显示名。")
+        inspect_parser.add_argument("--user-id", dest="user_id", help="用户 UUID。")
+        inspect_parser.add_argument("--asset", help="资产名称、地址或关键字。")
+        inspect_parser.add_argument("--asset-keywords", dest="asset_keywords", help="敏感资产关键字。")
+        inspect_parser.add_argument("--status", help="状态过滤。")
+        inspect_parser.add_argument("--direction", help="方向过滤，例如 upload / download。")
+        inspect_parser.add_argument("--keyword", help="关键字过滤。")
+        inspect_parser.add_argument("--protocol", help="协议过滤。")
+        inspect_parser.add_argument("--top", type=int, help="排行类场景返回前 N 条。")
+        add_filter_arguments(inspect_parser)
+        inspect_parser.set_defaults(func=_inspect)
 
-    capabilities_parser = subparsers.add_parser(
-        "capabilities",
-        help="列出 inspect capability 目录。",
-        description="输出所有由 jms_diagnose.py inspect 支持的 capability。",
-        formatter_class=CLIHelpFormatter,
-    )
-    capabilities_parser.set_defaults(func=_capabilities)
+    if "capabilities" in enabled_commands:
+        capabilities_parser = subparsers.add_parser(
+            "capabilities",
+            help="列出 inspect capability 目录。",
+            description="输出所有由 jms_diagnose.py inspect 支持的 capability。",
+            formatter_class=CLIHelpFormatter,
+        )
+        capabilities_parser.set_defaults(func=_capabilities)
     return parser
 
 
-def main() -> int:
+def main(profile: str = "all", argv: list[str] | None = None) -> int:
     def _run_cli():
-        parser = build_parser()
+        active_argv = list(sys.argv[1:] if argv is None else argv)
+        enabled_commands = _diagnose_profile_commands(profile)
+        parser = build_parser(profile)
         reject_deprecated_pagination_cli_args(
-            sys.argv[1:],
+            active_argv,
             script_name="jms_diagnose.py",
             deprecated_commands={
                 "resolve",
@@ -1358,14 +1483,14 @@ def main() -> int:
                 "reports",
                 "account-automations",
                 "inspect",
-            },
+            } & enabled_commands,
             usage_examples_by_command={
-                "recent-audit": RECENT_AUDIT_EXAMPLES,
-                "reports": REPORTS_EXAMPLES,
-                "inspect": INSPECT_EXAMPLES,
+                "recent-audit": _diagnose_usage_examples("recent-audit"),
+                "reports": _diagnose_usage_examples("reports"),
+                "inspect": _diagnose_usage_examples("inspect"),
             },
         )
-        args = parser.parse_args(sys.argv[1:])
+        args = parser.parse_args(active_argv)
         return args.func(args)
 
     return run_and_print(_run_cli)

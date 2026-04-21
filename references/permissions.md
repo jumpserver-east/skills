@@ -3,8 +3,8 @@
 ## 快速概览
 
 - 开始前先到 [runtime.md](runtime.md) 判断本次是“首次全量校验”还是“后续轻量校验”。
-- 主入口：`python3 scripts/jumpserver_api/jms_query.py <subcommand> ...`
-- 资产视角的规则命中解释入口：`python3 scripts/jumpserver_api/jms_diagnose.py asset-permission-explain ...`
+- 主入口：`python3 jumpserver-object-query/scripts/jms_query.py <subcommand> ...`
+- 资产视角的规则命中解释入口：`python3 jumpserver-permission-analysis/scripts/jms_diagnose.py asset-permission-explain ...`
 - 这个入口只提供查询：`permission-list`、`permission-get` 与 `asset-perm-users`
 - 权限命令要求先有已选组织；未选组织时先 `select-org`，跨组织授权完全禁止，不自动切组织。
 - `permission-list` 默认自动翻页抓取当前查询范围内的全部结果，不再支持 `--limit/--offset`。
@@ -38,26 +38,26 @@
 查询权限列表：
 
 ```bash
-python3 scripts/jumpserver_api/jms_query.py permission-list --resource asset-permission --name 生产环境授权
-python3 scripts/jumpserver_api/jms_query.py permission-list --resource login-acl --users <user-id>
-python3 scripts/jumpserver_api/jms_query.py permission-list --resource system-role --name SystemAdmin
-python3 scripts/jumpserver_api/jms_query.py asset-perm-users --asset-id <asset-id>
+python3 jumpserver-permission-analysis/scripts/jms_query.py permission-list --resource asset-permission --name 生产环境授权
+python3 jumpserver-permission-analysis/scripts/jms_query.py permission-list --resource login-acl --users <user-id>
+python3 jumpserver-permission-analysis/scripts/jms_query.py permission-list --resource system-role --name SystemAdmin
+python3 jumpserver-permission-analysis/scripts/jms_query.py asset-perm-users --asset-id <asset-id>
 ```
 
 读取权限详情：
 
 ```bash
-python3 scripts/jumpserver_api/jms_query.py permission-get --resource asset-permission --permission-id <permission-id>
-python3 scripts/jumpserver_api/jms_query.py permission-get --resource login-acl --id <acl-id>
+python3 jumpserver-permission-analysis/scripts/jms_query.py permission-get --resource asset-permission --permission-id <permission-id>
+python3 jumpserver-permission-analysis/scripts/jms_query.py permission-get --resource login-acl --id <acl-id>
 ```
 
 结合访问分析解释权限：
 
 ```bash
-python3 scripts/jumpserver_api/jms_diagnose.py user-asset-access --username openclaw --asset-name prod-host-01
-python3 scripts/jumpserver_api/jms_diagnose.py asset-permission-explain --asset-name prod-host-01
-python3 scripts/jumpserver_api/jms_query.py asset-perm-users --asset-id <asset-id>
-python3 scripts/jumpserver_api/jms_query.py permission-get --resource asset-permission --permission-id <permission-id>
+python3 jumpserver-effective-access/scripts/jms_diagnose.py user-asset-access --username openclaw --asset-name prod-host-01
+python3 jumpserver-permission-analysis/scripts/jms_diagnose.py asset-permission-explain --asset-name prod-host-01
+python3 jumpserver-permission-analysis/scripts/jms_query.py asset-perm-users --asset-id <asset-id>
+python3 jumpserver-permission-analysis/scripts/jms_query.py permission-get --resource asset-permission --permission-id <permission-id>
 ```
 
 ## 建议输出关注点

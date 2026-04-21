@@ -3,7 +3,7 @@
 ## 快速概览
 
 - 这份文档是 `inspect/analyze + capability` 能力单元的人类索引。
-- 机器可执行的能力元数据位于 `references/metadata/capabilities.json`，由 `scripts/jumpserver_api/jms_capabilities.py` 负责加载。
+- 机器可执行的能力元数据位于 `references/metadata/capabilities.json`，由 `jumpserver-api/jms_capabilities.py` 负责加载。
 - 当前共维护 `69` 个能力单元，其中 `P0=5`、`P1=56`、`P2=8`。
 - 每个能力单元都在元数据里固定维护以下字段：
   - 功能名称

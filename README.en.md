@@ -1,8 +1,8 @@
 # JumpServer Skills
 
-`jumpserver-skills` is a skill repository for JumpServer V4.10 that focuses on query workflows, audit investigation, and template-based usage reports. It is designed for object lookup, permission readback, audit investigation, governance inspection, access analysis, and bastion usage reports for a specific day or time range. It is closer to a reusable skill package with formal entrypoints than to a CLI tutorial that expects users to manually compose script commands.
+`jumpserver-skills` is a JumpServer V4.10 skill repository. The repository now uses a split layout: one backward-compatible router skill at the root, several narrower intention-driven child skills, and a shared runtime. It still covers object lookup, permission readback, audit investigation, governance inspection, access analysis, and bastion usage reporting, but the trigger boundaries are now narrower and easier to maintain.
 
-Inside the repository, requests are automatically routed to three formal entrypoints: `jms_query.py`, `jms_diagnose.py`, and `jms_report.py`. The repository stays read-only by default, only allowing local runtime writes to `.env` and the current organization context, and it does not perform JumpServer business write operations.
+Inside the repository, requests still reuse the same three formal entrypoints: `jms_query.py`, `jms_diagnose.py`, and `jms_report.py`. The repository stays read-only by default, only allowing local runtime writes to `.env` and the current organization context, and it does not perform JumpServer business write operations.
 
 [中文](./README.md)
 
@@ -26,6 +26,29 @@ For first-time use, the natural-language `.env` generation path is usually the f
 | Governance inspection | asset governance, account governance, access analysis, system inspection, capability-based aggregate analysis | `jms_diagnose.py` | Prefer capability aggregation instead of forcing users to stitch together scattered queries |
 | Usage reports | daily reports, usage situation, usage analysis, what happened on a day, rankings or overviews for a time range | `jms_report.py` | These requests produce a complete HTML report instead of a one-line summary |
 
+## Subskill Layout
+
+The repository keeps the root [SKILL.md](./SKILL.md) as the compatibility router skill and adds 7 narrower child skills:
+
+| Child skill | Focus | Primary entrypoint |
+|---|---|---|
+| `jumpserver-runtime-setup` | configuration, preflight, connectivity, org switching, execution-context troubleshooting | `jms_diagnose.py` |
+| `jumpserver-object-query` | assets, accounts, users, orgs, platforms, nodes, labels, zones, and object detail lookup | `jms_query.py` |
+| `jumpserver-effective-access` | what a user can actually access right now | `jms_diagnose.py` |
+| `jumpserver-permission-analysis` | permission rules, ACL, RBAC, why access exists, who is authorized to an asset | `jms_query.py` / `jms_diagnose.py` |
+| `jumpserver-audit-investigation` | login, session, command, file-transfer, job details, named-user login counts | `jms_query.py` / `jms_diagnose.py` |
+| `jumpserver-usage-reporting` | day or time-range usage overviews, rankings, and HTML reports | `jms_report.py` |
+| `jumpserver-governance-inspection` | capability aggregation, settings, license, tickets, storage, governance inspection | `jms_diagnose.py` |
+
+The shared pieces stay centralized: the reusable low-level modules now live in `jumpserver-api/`, `references/` remains the rules library, and `template/` remains the HTML-report template area.
+
+To support hosts that can register only one skill at a time, each child skill directory now also contains:
+
+- `agents/openai.yaml`: an integration descriptor for that child skill
+- `scripts/*.py`: the local entrypoint scripts for each child skill; they load `jumpserver-api/` directly instead of treating `jumpserver-runtime-setup` as the host for all Python code
+
+That means a `jumpserver-*` child directory can now be used directly as the skill root when needed.
+
 ## How To Use This Skill
 
 1. Prepare the environment file. Create `.env` in the repository root. There are two ways to do it:
@@ -43,11 +66,13 @@ If local configuration is incomplete, the runtime can also generate `.env` direc
 - "Help me generate `.env`. My JumpServer URL is `https://jump.example.com`, and I log in with AK/SK."
 - "Help me initialize JumpServer config. I log in with username and password, and I do not want certificate verification."
 
-2. Connect this skill to your agent or Codex environment. The repository file [agents/openai.yaml](./agents/openai.yaml) provides a ready-to-use skill integration description and can serve as one of the entrypoints for referencing or registering the skill.
+2. Connect this skill to your agent or Codex environment. The repository file [agents/openai.yaml](./agents/openai.yaml) describes the router skill.
 
-3. Describe requests directly in natural language instead of manually assembling script commands. For example: "Which assets can this user access in the Default organization?", "Show me yesterday's usage", or "Show the details of this permission rule."
+3. If your runtime supports multi-skill discovery, prefer triggering the narrower child skill directly. If the host can register only one skill at a time, you can also register a `jumpserver-*` child directory directly and use its own `agents/openai.yaml`.
 
-4. Add context based on the returned result. If the result shows `candidate_orgs`, `switchable_orgs`, candidate objects, or a missing time range, follow the prompt and provide the organization, object name, platform, or time window. When organization selection is mandatory, the response also includes `reason_code`, `user_message`, `action_hint`, `suggested_commands`, and `candidate_org_count` so the next step is explicit.
+4. Describe requests directly in natural language instead of manually assembling script commands. For example: "Which assets can this user access in the Default organization?", "Show me yesterday's usage", or "Show the details of this permission rule."
+
+5. Add context based on the returned result. If the result shows `candidate_orgs`, `switchable_orgs`, candidate objects, or a missing time range, follow the prompt and provide the organization, object name, platform, or time window. When organization selection is mandatory, the response also includes `reason_code`, `user_message`, `action_hint`, `suggested_commands`, and `candidate_org_count` so the next step is explicit.
 
 You do not need to remember specific execution commands. This skill performs preflight first, then routes to the formal entrypoint automatically, and prompts for organization, object, or time-range details only when needed.
 
@@ -62,19 +87,19 @@ If you want to run the formal entrypoints manually, use parameters in this order
 Recommended style:
 
 ```bash
-python3 scripts/jumpserver_api/jms_diagnose.py select-org --org-name Default
-python3 scripts/jumpserver_api/jms_diagnose.py user-assets --org-name Default --username example.user
-python3 scripts/jumpserver_api/jms_query.py object-list --resource organization --name Default
-python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability session-record-query --days 7 --user example.user
-python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability hot-assets-ranking --days 30 --top 10
-python3 scripts/jumpserver_api/jms_diagnose.py reports --report-type account-statistic --days 30
+python3 jumpserver-runtime-setup/scripts/jms_diagnose.py select-org --org-name Default
+python3 jumpserver-effective-access/scripts/jms_diagnose.py user-assets --org-name Default --username example.user
+python3 jumpserver-object-query/scripts/jms_query.py object-list --resource organization --name Default
+python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability session-record-query --days 7 --user example.user
+python3 jumpserver-governance-inspection/scripts/jms_diagnose.py inspect --capability hot-assets-ranking --days 30 --top 10
+python3 jumpserver-governance-inspection/scripts/jms_diagnose.py reports --report-type account-statistic --days 30
 ```
 
 Compatibility style:
 
 ```bash
-python3 scripts/jumpserver_api/jms_query.py object-list --resource organization --filters '{"name":"Default"}'
-python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability session-record-query --filter user=example.user --filter days=7
+python3 jumpserver-object-query/scripts/jms_query.py object-list --resource organization --filters '{"name":"Default"}'
+python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability session-record-query --filter user=example.user --filter days=7
 ```
 
 List and analysis commands now auto-paginate and return the full result set for the requested range, so `--limit/--offset` are no longer supported.
@@ -196,8 +221,16 @@ Organization-blocking responses also include these structured fields:
 
 | File | Purpose |
 |---|---|
-| [SKILL.md](./SKILL.md) | top-level routing rules, organization priority, and response constraints |
+| [SKILL.md](./SKILL.md) | router skill for high-level intent selection, shared guardrails, and backward compatibility |
 | [agents/openai.yaml](./agents/openai.yaml) | skill integration description and default prompt entry |
+| [jumpserver-runtime-setup/SKILL.md](./jumpserver-runtime-setup/SKILL.md) | runtime setup, preflight, and org-context child skill |
+| [jumpserver-object-query/SKILL.md](./jumpserver-object-query/SKILL.md) | object-query child skill |
+| [jumpserver-effective-access/SKILL.md](./jumpserver-effective-access/SKILL.md) | effective-access child skill |
+| [jumpserver-permission-analysis/SKILL.md](./jumpserver-permission-analysis/SKILL.md) | permission-analysis child skill |
+| [jumpserver-audit-investigation/SKILL.md](./jumpserver-audit-investigation/SKILL.md) | audit-investigation child skill |
+| [jumpserver-usage-reporting/SKILL.md](./jumpserver-usage-reporting/SKILL.md) | usage-reporting child skill |
+| [jumpserver-governance-inspection/SKILL.md](./jumpserver-governance-inspection/SKILL.md) | governance-inspection child skill |
+| [references/single-skill-registration.md](./references/single-skill-registration.md) | how to register one child skill at a time |
 | [references/routing-playbook.md](./references/routing-playbook.md) | ordinary routing, typical trigger words, blocking rules, and counterexamples |
 | [references/report-template-playbook.md](./references/report-template-playbook.md) | template report workflow, organization priority, time-range handling, and report rules |
 | [references/runtime.md](./references/runtime.md) | preflight flow, environment variable model, organization selection, and runtime constraints |

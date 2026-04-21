@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-from .jms_types import JumpServerAPIError
+from jms_types import JumpServerAPIError
 
 
 @dataclass(frozen=True)
@@ -27,7 +27,7 @@ class CapabilitySpec:
 
 
 def metadata_root() -> Path:
-    return Path(__file__).resolve().parents[2] / "references" / "metadata"
+    return Path(__file__).resolve().parents[1] / "references" / "metadata"
 
 
 def metadata_path(filename: str) -> Path:

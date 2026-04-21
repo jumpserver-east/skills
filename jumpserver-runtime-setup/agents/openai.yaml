@@ -1,0 +1,11 @@
+interface:
+  display_name: "JumpServer Runtime Setup"
+  short_description: "JumpServer V4.10 单 skill 接入描述。适用于配置、预检、连通性、组织切换和执行上下文排障。"
+  default_prompt: |
+    使用 $jumpserver-runtime-setup 处理 JumpServer V4.10 配置、预检、连通性、组织切换和执行上下文问题。
+    当这个子目录被单独注册为 skill 根目录时，优先使用本地入口：
+    - `python3 scripts/jms_diagnose.py config-status --json`
+    - `python3 scripts/jms_diagnose.py ping`
+    - `python3 scripts/jms_diagnose.py select-org --org-id <org-id> --confirm`
+    这些本地入口会从仓库根目录加载共享底层 `jumpserver-api/...`；如果共享目录不存在，说明当前 skill 包不完整。
+    先做 `config-status --json` 和 `ping` 预检。只允许本地运行时写入 `config-write --confirm` 与 `select-org --confirm`，不执行业务写操作。

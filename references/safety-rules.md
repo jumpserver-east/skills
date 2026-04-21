@@ -37,7 +37,7 @@
 | 名称存在歧义 | 拒绝继续执行 |
 | 当前组织是 A，目标对象在 B | 拒绝跨组织继续执行 |
 | 请求对象写操作 | 直接说明超出本仓库范围 |
-| 想用临时脚本绕过正式入口 | 拒绝并回到 `scripts/jumpserver_api/jms_*.py` |
+| 想用临时脚本绕过正式入口 | 拒绝并回到子 skill wrapper：`jumpserver-object-query/scripts/jms_query.py`、`jumpserver-runtime-setup/scripts/jms_diagnose.py`、`jumpserver-usage-reporting/scripts/jms_report.py` |
 
 ## 推荐阻塞模板
 

@@ -16,8 +16,8 @@
       "/api/v1/terminal/commands/?session_id=<session_id>"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_query.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-audit-investigation/scripts/jms_query.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "user",
@@ -51,8 +51,8 @@
       "/api/v1/terminal/sessions/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_query.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-audit-investigation/scripts/jms_query.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "user",
@@ -83,8 +83,8 @@
       "/api/v1/audits/ftp-logs/{pk}/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_query.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-audit-investigation/scripts/jms_query.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "user",
@@ -114,8 +114,8 @@
       "/api/v1/terminal/commands/insecure-command/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_query.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-audit-investigation/scripts/jms_query.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "user",
@@ -149,8 +149,8 @@
       "/api/v1/assets/assets/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_query.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-audit-investigation/scripts/jms_query.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "asset",
@@ -179,8 +179,8 @@
       "/api/v1/audits/login-logs/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_query.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-audit-investigation/scripts/jms_query.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "date_from",
@@ -210,8 +210,8 @@
       "/api/v1/audits/login-logs/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_query.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-audit-investigation/scripts/jms_query.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "source_ip",
@@ -240,8 +240,8 @@
       "/api/v1/audits/login-logs/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_query.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-audit-investigation/scripts/jms_query.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "date_from",
@@ -272,8 +272,8 @@
       "/api/v1/terminal/commands/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_query.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-audit-investigation/scripts/jms_query.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "account",
@@ -304,8 +304,8 @@
       "/api/v1/audits/ftp-logs/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_query.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-audit-investigation/scripts/jms_query.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "direction",
@@ -337,8 +337,8 @@
       "/api/v1/terminal/commands/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "account",
@@ -368,8 +368,8 @@
       "/api/v1/terminal/commands/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "asset",
@@ -397,8 +397,8 @@
       "/api/v1/assets/assets/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "type",
@@ -425,8 +425,8 @@
       "/api/v1/audits/user-sessions/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "date_from",
@@ -455,8 +455,8 @@
       "/api/v1/accounts/account-templates/{pk}/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "name",
@@ -482,8 +482,8 @@
       "/api/v1/audits/user-sessions/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "days",
@@ -512,8 +512,8 @@
       "/api/v1/terminal/sessions/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "date_from",
@@ -543,8 +543,8 @@
       "/api/v1/assets/databases/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "name",
@@ -573,8 +573,8 @@
       "/api/v1/assets/assets/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "name",
@@ -601,8 +601,8 @@
       "/api/v1/accounts/account-templates/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "asset",
@@ -628,8 +628,8 @@
       "/api/v1/assets/assets/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "name",
@@ -656,8 +656,8 @@
       "/api/v1/terminal/status/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "is_active",
@@ -686,8 +686,8 @@
       "/api/v1/assets/nodes/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "node",
@@ -714,8 +714,8 @@
       "/api/v1/accounts/accounts/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "account",
@@ -743,8 +743,8 @@
       "/api/v1/users/users/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "user"
@@ -771,8 +771,8 @@
       "/api/v1/terminal/commands/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "days",
@@ -800,8 +800,8 @@
       "/api/v1/accounts/accounts/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "account",
@@ -829,8 +829,8 @@
       "/api/v1/accounts/accounts/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "account",
@@ -857,8 +857,8 @@
       "/api/v1/assets/assets/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "account",
@@ -886,8 +886,8 @@
       "/api/v1/terminal/sessions/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_query.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-audit-investigation/scripts/jms_query.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "date_from",
@@ -916,8 +916,8 @@
       "/api/v1/terminal/commands/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_query.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-audit-investigation/scripts/jms_query.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "date_from",
@@ -949,8 +949,8 @@
       "/api/v1/audits/ftp-logs/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_query.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-audit-investigation/scripts/jms_query.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "date_from",
@@ -981,8 +981,8 @@
       "/api/v1/settings/server-info/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "module",
@@ -1009,8 +1009,8 @@
       "/api/v1/settings/security/block-ip/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "keys",
@@ -1037,8 +1037,8 @@
       "/api/v1/authentication/auth/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "keys"
@@ -1064,8 +1064,8 @@
       "/api/v1/authentication/auth/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "keys",
@@ -1093,8 +1093,8 @@
       "/api/v1/notifications/backends/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "channel",
@@ -1122,8 +1122,8 @@
       "/api/v1/tickets/apply-command-tickets/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "status",
@@ -1152,8 +1152,8 @@
       "/api/v1/terminal/replay-storages/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "status"
@@ -1179,8 +1179,8 @@
       "/api/v1/assets/nodes/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "org_id",
@@ -1208,8 +1208,8 @@
       "/api/v1/rbac/roles/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "role",
@@ -1236,8 +1236,8 @@
       "/api/v1/terminal/commands/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "date_from",
@@ -1266,8 +1266,8 @@
       "/api/v1/terminal/commands/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "date_from",
@@ -1296,8 +1296,8 @@
       "/api/v1/terminal/commands/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "date_from",
@@ -1326,8 +1326,8 @@
       "/api/v1/terminal/commands/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "days"
@@ -1353,8 +1353,8 @@
       "/api/v1/terminal/sessions/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "date_from",
@@ -1383,8 +1383,8 @@
       "/api/v1/audits/ftp-logs/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "date_from",
@@ -1413,8 +1413,8 @@
       "/api/v1/audits/user-sessions/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "date_from",
@@ -1442,8 +1442,8 @@
       "/api/v1/audits/user-sessions/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "days",
@@ -1471,8 +1471,8 @@
       "/api/v1/terminal/commands/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "days",
@@ -1499,8 +1499,8 @@
       "/api/v1/audits/user-sessions/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "date_from",
@@ -1530,8 +1530,8 @@
       "/api/v1/audits/user-sessions/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "date_from",
@@ -1561,8 +1561,8 @@
       "/api/v1/audits/user-sessions/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_query.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-audit-investigation/scripts/jms_query.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "date_from",
@@ -1590,8 +1590,8 @@
       "/api/v1/audits/user-sessions/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_query.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-audit-investigation/scripts/jms_query.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "date_from",
@@ -1620,8 +1620,8 @@
       "/api/v1/authentication/auth/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "keys"
@@ -1648,8 +1648,8 @@
       "/api/v1/terminal/replay-storages/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "keys"
@@ -1674,8 +1674,8 @@
       "/api/v1/assets/platforms/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "name"
@@ -1700,8 +1700,8 @@
       "/api/v1/accounts/account-templates/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "name",
@@ -1728,8 +1728,8 @@
       "/api/v1/assets/platforms/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "platform",
@@ -1755,8 +1755,8 @@
       "/api/v1/settings/setting/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "category"
@@ -1781,8 +1781,8 @@
       "/api/v1/xpack/license/detail"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [],
     "summary_strategy": "返回许可证详情原始对象，并标注当前是否可读。",
@@ -1805,8 +1805,8 @@
       "/api/v1/tickets/tickets/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "status"
@@ -1831,8 +1831,8 @@
       "/api/v1/terminal/command-storages/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [],
     "summary_strategy": "返回命令存储数量、默认存储数量与样本配置。",
@@ -1855,8 +1855,8 @@
       "/api/v1/terminal/replay-storages/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [],
     "summary_strategy": "返回录像存储数量、默认存储数量与样本配置。",
@@ -1879,8 +1879,8 @@
       "/api/v1/terminal/terminals/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [],
     "summary_strategy": "返回终端组件数量和组件样本。",
@@ -1910,8 +1910,8 @@
       "/api/v1/accounts/change-secret-dashboard/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "report_type",
@@ -1946,8 +1946,8 @@
       "/api/v1/accounts/account-check-engines/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "days",
@@ -1975,8 +1975,8 @@
       "/api/v1/terminal/status/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "days",
@@ -2003,8 +2003,8 @@
       "/api/v1/audits/password-change-logs/"
     ],
     "scripts": [
-      "scripts/jumpserver_api/jms_diagnose.py",
-      "scripts/jumpserver_api/jms_analytics.py"
+      "jumpserver-governance-inspection/scripts/jms_diagnose.py",
+      "jumpserver-api/jms_analytics.py"
     ],
     "input_params": [
       "days",

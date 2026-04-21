@@ -2,23 +2,33 @@
 
 ## 当前结构摘要
 
+- 仓库入口改成“根目录总路由 skill + 7 个按用户意图拆分的子 skills + 共享运行时”的结构。
+- 每个子 skill 目录现在都可以附带自己的 `agents/openai.yaml` 与本地入口脚本，适配“一次只能注册一个 skill”的宿主。
 - 维持 3 个正式业务入口的分域心智模型：`query / diagnose / report`。
-- 把底层执行统一收口到 `scripts/jumpserver_api/`，不让请求入口散落在顶层或依赖临时 SDK 包装。
+- 把底层执行统一收口到 `jumpserver-api/`，不让请求入口散落在顶层或依赖临时 SDK 包装。
 - 把“查询类能力”组织成 `capability` 能力单元，便于技能路由、意图识别和跨环境复用。
 - 把运行时、能力元数据、统计聚合、对象查询、权限回看分层拆开，避免把 CLI 入口、业务逻辑和底层请求耦合在一起。
-- `SKILL.md` 负责路由、边界和输入输出风格；`README.md` 负责整体使用说明；`references/*.md` 负责分域规则和能力清单；`references/metadata/*.json` 负责运行时结构化元数据；`jms_capabilities.py` 负责加载和导出能力事实。
+- 根目录 `SKILL.md` 负责总路由、共享边界和兼容旧入口；子 skill 目录负责细粒度触发；`README.md` 负责整体使用说明；`references/*.md` 负责分域规则和能力清单；`references/metadata/*.json` 负责运行时结构化元数据；`jms_capabilities.py` 负责加载和导出能力事实。
 
 ## 目录与职责
 
 | 目录 / 文件 | 当前职责 | 说明 |
 |---|---|---|
-| `scripts/jumpserver_api/jms_runtime.py` | 环境加载、组织上下文、客户端构建、公共 CLI 行为 | 所有正式入口共享 |
-| `scripts/jumpserver_api/jms_query.py` | 资产、平台、节点、账号、账号模板、用户、用户组、组织、标签、网域查询 | 按对象域集中只读查询 |
-| `scripts/jumpserver_api/jms_query.py` | 授权规则、ACL、RBAC 与资产授权用户查询 | 不承担授权写入 |
-| `scripts/jumpserver_api/jms_query.py` | 审计列表、详情、terminal 会话、命令存储提示、能力分析 | 统一承接调查类意图 |
-| `scripts/jumpserver_api/jms_diagnose.py` | 预检、连通性、对象解析、设置/许可证/报表/工单/存储查询、治理/巡检查询 | 统一承接治理和环境查询能力 |
-| `scripts/jumpserver_api/jms_analytics.py` | 多接口聚合、统计、排行、巡检逻辑 | 避免在 CLI 入口里复制逻辑 |
-| `scripts/jumpserver_api/jms_capabilities.py` | 能力单元元数据加载与导出 | 从 `references/metadata/capabilities.json` 读取每个能力的标准描述 |
+| `SKILL.md` | 总路由 skill | 兼容旧入口，只保留高层路由、共享运行时和安全边界 |
+| `jumpserver-*/SKILL.md` | 按用户意图拆分的子 skills | 分别覆盖 runtime setup、object query、effective access、permission analysis、audit investigation、usage reporting、governance inspection |
+| `jumpserver-*/agents/openai.yaml` | 子 skill 独立接入描述 | 适合宿主直接把子目录作为 skill 根目录注册 |
+| `jumpserver-*/scripts/*.py` | 子 skill 本地入口脚本 | 直接加载 `jumpserver-api/`，并只暴露当前子 skill 自己的命令集合 |
+| `jumpserver-api/jms_runtime.py` | 环境加载、组织上下文、客户端构建、公共 CLI 行为 | 所有正式入口共享 |
+| `jumpserver-object-query/scripts/jms_query.py` | 资产、平台、节点、账号、账号模板、用户、用户组、组织、标签、网域查询 | 按对象域集中只读查询 |
+| `jumpserver-permission-analysis/scripts/jms_query.py` | 授权规则、ACL、RBAC 与资产授权用户查询 | 不承担授权写入 |
+| `jumpserver-audit-investigation/scripts/jms_query.py` | 审计列表、详情、terminal 会话、命令存储提示、能力分析 | 统一承接调查类意图 |
+| `jumpserver-runtime-setup/scripts/jms_diagnose.py` | 预检、连通性、组织切换、对象解析、端点 inventory 与端点验证 | 统一承接运行时与环境查询能力 |
+| `jumpserver-effective-access/scripts/jms_diagnose.py` | 用户有效访问资产、节点、账号与协议范围 | 统一承接 effective access 结果查询 |
+| `jumpserver-permission-analysis/scripts/jms_diagnose.py` | 资产视角的权限命中解释 | 解释为什么能访问 |
+| `jumpserver-audit-investigation/scripts/jms_diagnose.py` | 最近审计快捷查询 | 用于页面同款快速审计调查 |
+| `jumpserver-governance-inspection/scripts/jms_diagnose.py` | 设置、许可证、工单、存储、报表与治理巡检查询 | 统一承接治理与巡检分析 |
+| `jumpserver-api/jms_analytics.py` | 多接口聚合、统计、排行、巡检逻辑 | 避免在 CLI 入口里复制逻辑 |
+| `jumpserver-api/jms_capabilities.py` | 能力单元元数据加载与导出 | 从 `references/metadata/capabilities.json` 读取每个能力的标准描述 |
 
 ## 能力域 -> 当前能力 -> 脚本实现 -> 触发描述
 
@@ -69,7 +79,10 @@
 
 | 文件 | 负责内容 | 不负责内容 |
 |---|---|---|
-| `SKILL.md` | 何时适用、如何路由、什么场景要停下、输出模板 | 细颗粒度 API 映射和实现细节 |
+| 根目录 `SKILL.md` | 高层意图路由、共享边界、兼容旧入口 | 细颗粒度领域规则 |
+| `jumpserver-*/SKILL.md` | 具体意图的触发条件、主入口与关键边界 | 运行时公共实现细节 |
+| `jumpserver-*/agents/openai.yaml` | 单 skill 注册时的独立接入提示词 | 共享规则正文 |
+| `jumpserver-*/scripts/*.py` | 单 skill 注册时的本地命令入口 | 业务逻辑实现本体 |
 | `README.md` | 整体定位、目录结构、使用方式、常见场景、维护约定 | 每个能力的逐条元数据 |
 | `references/*.md` | 分域规则、能力目录、映射关系、排障路径、验证结论 | 运行时公共实现细节 |
 | `references/metadata/capabilities.json` + `jms_capabilities.py` | 能力单元的结构化事实定义与加载 | 面向使用者的叙述性教程 |
@@ -77,6 +90,7 @@
 ## 为什么当前结构更容易维护
 
 - 入口少而稳定：固定为 3 个正式 CLI 入口。
+- 触发更窄：高层路由和子领域规则分开后，不再需要用一个大 skill 同时覆盖全部意图。
 - 公共逻辑集中：运行时、请求签名、组织选择不在多个脚本里复制。
 - 查询能力模块化：统计类、审计类、巡检类都通过 handler + metadata 组合扩展。
 - 文档与代码一一对应：`capability_id -> handler -> endpoint -> reference` 关系是显式的。

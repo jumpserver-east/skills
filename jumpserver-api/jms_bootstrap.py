@@ -9,8 +9,9 @@ from importlib import metadata
 from pathlib import Path
 
 
-SKILL_DIR = Path(__file__).resolve().parents[2]
-REQUIREMENTS_FILE = SKILL_DIR / "requirements.txt"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SKILL_DIR = REPO_ROOT
+REQUIREMENTS_FILE = REPO_ROOT / "requirements.txt"
 _REQUIREMENT_SPLIT_RE = re.compile(r"\s*(?:\[|===|==|~=|!=|<=|>=|<|>|@)")
 _OPTION_PREFIXES = (
     "-r",

@@ -5,7 +5,7 @@
 ## 1) 组件负载概览
 
 - capability_id: `component-load-overview`
-- 入口: `python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability component-load-overview --days 1`
+- 入口: `python3 jumpserver-governance-inspection/scripts/jms_diagnose.py inspect --capability component-load-overview --days 1`
 - 主要来源接口: `/api/v1/terminal/terminals/`
 
 ### 适用问题
@@ -38,7 +38,7 @@
 ## 2) 改密失败报错分析报表
 
 - capability_id: `change-password-failure-report`
-- 入口: `python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability change-password-failure-report --days 30`
+- 入口: `python3 jumpserver-governance-inspection/scripts/jms_diagnose.py inspect --capability change-password-failure-report --days 30`
 - 主要来源接口: `/api/v1/audits/password-change-logs/`
 
 ### 适用问题

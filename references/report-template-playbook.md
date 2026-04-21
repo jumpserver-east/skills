@@ -32,13 +32,13 @@
 ## 固定流程
 
 ```text
-config-status --json -> ping -> 按组织优先级处理 -> python3 scripts/jumpserver_api/jms_report.py daily-usage ... -> 生成后自检 -> 输出 HTML
+config-status --json -> ping -> 按组织优先级处理 -> python3 jumpserver-usage-reporting/scripts/jms_report.py daily-usage ... -> 生成后自检 -> 输出 HTML
 ```
 
 正式报告入口固定为：
 
 ```bash
-python3 scripts/jumpserver_api/jms_report.py daily-usage \
+python3 jumpserver-usage-reporting/scripts/jms_report.py daily-usage \
   --date 2026-03-10 \
   --org-id 00000000-0000-0000-0000-000000000000
 ```
@@ -53,7 +53,7 @@ python3 scripts/jumpserver_api/jms_report.py daily-usage \
 
 1. 用户显式给组织 -> 按用户指定组织执行
 2. 用户显式说“所有组织”或“全局组织” -> 视为全局组织 `00000000-0000-0000-0000-000000000000`
-3. 用户未显式给组织 -> 先执行 `python3 scripts/jumpserver_api/jms_diagnose.py select-org --org-id 00000000-0000-0000-0000-000000000000 --confirm`
+3. 用户未显式给组织 -> 先执行 `python3 jumpserver-runtime-setup/scripts/jms_diagnose.py select-org --org-id 00000000-0000-0000-0000-000000000000 --confirm`
 4. 全局组织可访问性不只看候选组织列表；允许通过显式 `select-org` / 直连探测确认
 5. 全局组织直连探测或显式选择验证失败 -> 阻塞并返回 `candidate_orgs`
 
@@ -114,10 +114,10 @@ python3 scripts/jumpserver_api/jms_report.py daily-usage \
 
 字段取数时只使用元数据中声明的来源，例如：
 
-- `python3 scripts/jumpserver_api/jms_diagnose.py license-detail`
-- `python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability ...`
-- `python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type login`
-- `python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability ...`
+- `python3 jumpserver-governance-inspection/scripts/jms_diagnose.py license-detail`
+- `python3 jumpserver-governance-inspection/scripts/jms_diagnose.py inspect --capability ...`
+- `python3 jumpserver-audit-investigation/scripts/jms_query.py audit-list --audit-type login`
+- `python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability ...`
 
 正式入口内部直接复用 Python 模块与 handler，不通过 subprocess 套 CLI JSON。不要手工发明新的数据来源，也不要回退到临时 HTML 拼装逻辑。
 
@@ -139,7 +139,7 @@ python3 scripts/jumpserver_api/jms_report.py daily-usage \
 
 - 完整 HTML 报告
 - 明确说明“报告已生成”
-- 正式入口：`python3 scripts/jumpserver_api/jms_report.py daily-usage ...`
+- 正式入口：`python3 jumpserver-usage-reporting/scripts/jms_report.py daily-usage ...`
 - 报告文件路径
 - 文件存在性与大小：`output_exists`、`output_size_bytes`、`output_size_human`
 - 模板路径：`template/bastion-daily-usage-template.html`
@@ -204,7 +204,7 @@ python3 scripts/jumpserver_api/jms_report.py daily-usage \
 使用正式契约测试脚本：
 
 ```bash
-python3 scripts/jumpserver_api/jms_report.py contract-check
+python3 jumpserver-usage-reporting/scripts/jms_report.py contract-check
 ```
 
 这个测试至少检查：

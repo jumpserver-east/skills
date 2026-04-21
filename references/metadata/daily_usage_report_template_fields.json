@@ -15,7 +15,7 @@
       "source_kind": "direct_cli",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_diagnose.py license-detail",
+          "entrypoint": "python3 jumpserver-governance-inspection/scripts/jms_diagnose.py license-detail",
           "output_field": "corporation"
         }
       ],
@@ -32,7 +32,7 @@
       "source_kind": "direct_cli",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_diagnose.py license-detail",
+          "entrypoint": "python3 jumpserver-governance-inspection/scripts/jms_diagnose.py license-detail",
           "output_field": "asset_count"
         }
       ],
@@ -49,7 +49,7 @@
       "source_kind": "direct_cli",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_diagnose.py license-detail",
+          "entrypoint": "python3 jumpserver-governance-inspection/scripts/jms_diagnose.py license-detail",
           "output_field": "asset_count - current_asset_count"
         }
       ],
@@ -66,22 +66,22 @@
       "source_kind": "derived",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type login"
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-list --audit-type login"
         },
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability session-record-query",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability session-record-query",
           "capability_id": "session-record-query"
         },
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability command-record-query",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability command-record-query",
           "capability_id": "command-record-query"
         },
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability file-transfer-log-query",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability file-transfer-log-query",
           "capability_id": "file-transfer-log-query"
         },
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability suspicious-operation-summary",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability suspicious-operation-summary",
           "capability_id": "suspicious-operation-summary"
         }
       ],
@@ -173,7 +173,7 @@
       "source_kind": "direct_cli",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type login",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-list --audit-type login",
           "output_field": "login_total"
         }
       ],
@@ -190,7 +190,7 @@
       "source_kind": "direct_cli",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type login",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-list --audit-type login",
           "output_field": "login_success"
         }
       ],
@@ -207,11 +207,11 @@
       "source_kind": "direct_cli",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type login",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-list --audit-type login",
           "output_field": "login_failed"
         },
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability failed-login-statistics",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability failed-login-statistics",
           "capability_id": "failed-login-statistics"
         }
       ],
@@ -228,7 +228,7 @@
       "source_kind": "direct_cli",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type login",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-list --audit-type login",
           "output_field": "unique_login_city_count"
         }
       ],
@@ -245,7 +245,7 @@
       "source_kind": "direct_cli",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type login",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-list --audit-type login",
           "output_field": "top_login_ip_summary"
         }
       ],
@@ -262,7 +262,7 @@
       "source_kind": "direct_cli",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type login",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-list --audit-type login",
           "output_field": "rows_html"
         }
       ],
@@ -285,10 +285,10 @@
       "source_kind": "derived",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type login"
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-list --audit-type login"
         },
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability failed-login-statistics",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability failed-login-statistics",
           "capability_id": "failed-login-statistics"
         }
       ],
@@ -316,7 +316,7 @@
       "source_kind": "capability",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability session-record-query",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability session-record-query",
           "capability_id": "session-record-query",
           "output_field": "session_total"
         }
@@ -334,7 +334,7 @@
       "source_kind": "derived",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability session-record-query",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability session-record-query",
           "capability_id": "session-record-query"
         }
       ],
@@ -353,7 +353,7 @@
       "source_kind": "capability",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability session-record-query",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability session-record-query",
           "capability_id": "session-record-query",
           "output_field": "avg_session_duration"
         }
@@ -371,7 +371,7 @@
       "source_kind": "capability",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability session-duration-ranking",
+          "entrypoint": "python3 jumpserver-governance-inspection/scripts/jms_diagnose.py inspect --capability session-duration-ranking",
           "capability_id": "session-duration-ranking",
           "output_field": "longest_session"
         }
@@ -389,7 +389,7 @@
       "source_kind": "capability",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability protocol-usage-distribution",
+          "entrypoint": "python3 jumpserver-governance-inspection/scripts/jms_diagnose.py inspect --capability protocol-usage-distribution",
           "capability_id": "protocol-usage-distribution",
           "output_field": "rows_html"
         }
@@ -412,7 +412,7 @@
       "source_kind": "derived",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability session-record-query",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability session-record-query",
           "capability_id": "session-record-query"
         }
       ],
@@ -436,11 +436,11 @@
       "source_kind": "derived",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability recent-active-users-ranking",
+          "entrypoint": "python3 jumpserver-governance-inspection/scripts/jms_diagnose.py inspect --capability recent-active-users-ranking",
           "capability_id": "recent-active-users-ranking"
         },
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability session-record-query",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability session-record-query",
           "capability_id": "session-record-query"
         }
       ],
@@ -464,7 +464,7 @@
       "source_kind": "capability",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability recent-active-assets-ranking",
+          "entrypoint": "python3 jumpserver-governance-inspection/scripts/jms_diagnose.py inspect --capability recent-active-assets-ranking",
           "capability_id": "recent-active-assets-ranking",
           "output_field": "rows_html"
         }
@@ -486,7 +486,7 @@
       "source_kind": "capability",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability session-duration-ranking",
+          "entrypoint": "python3 jumpserver-governance-inspection/scripts/jms_diagnose.py inspect --capability session-duration-ranking",
           "capability_id": "session-duration-ranking",
           "output_field": "rows_html"
         }
@@ -509,7 +509,7 @@
       "source_kind": "derived",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability session-record-query",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability session-record-query",
           "capability_id": "session-record-query"
         }
       ],
@@ -535,7 +535,7 @@
       "source_kind": "capability",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability command-record-query",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability command-record-query",
           "capability_id": "command-record-query",
           "output_field": "command_total"
         }
@@ -553,7 +553,7 @@
       "source_kind": "capability",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability high-risk-command-audit",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability high-risk-command-audit",
           "capability_id": "high-risk-command-audit",
           "output_field": "high_risk_command_total"
         }
@@ -571,7 +571,7 @@
       "source_kind": "capability",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability command-record-query",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability command-record-query",
           "capability_id": "command-record-query",
           "output_field": "top_command_users"
         }
@@ -589,7 +589,7 @@
       "source_kind": "capability",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability command-record-query",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability command-record-query",
           "capability_id": "command-record-query",
           "output_field": "top_command_assets"
         }
@@ -607,11 +607,11 @@
       "source_kind": "derived",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability command-record-query",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability command-record-query",
           "capability_id": "command-record-query"
         },
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability high-risk-command-audit",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability high-risk-command-audit",
           "capability_id": "high-risk-command-audit"
         }
       ],
@@ -633,12 +633,12 @@
       "source_kind": "capability",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability high-risk-command-audit",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability high-risk-command-audit",
           "capability_id": "high-risk-command-audit",
           "output_field": "rows_html"
         },
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability command-record-query",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability command-record-query",
           "capability_id": "command-record-query"
         }
       ],
@@ -664,11 +664,11 @@
       "source_kind": "derived",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability command-record-query",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability command-record-query",
           "capability_id": "command-record-query"
         },
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability high-risk-command-audit",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability high-risk-command-audit",
           "capability_id": "high-risk-command-audit"
         }
       ],
@@ -691,7 +691,7 @@
       "source_kind": "capability",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability suspicious-operation-summary",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability suspicious-operation-summary",
           "capability_id": "suspicious-operation-summary",
           "output_field": "risk_event_total"
         }
@@ -709,19 +709,19 @@
       "source_kind": "derived",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability suspicious-operation-summary",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability suspicious-operation-summary",
           "capability_id": "suspicious-operation-summary"
         },
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability failed-login-statistics",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability failed-login-statistics",
           "capability_id": "failed-login-statistics"
         },
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability high-risk-command-audit",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability high-risk-command-audit",
           "capability_id": "high-risk-command-audit"
         },
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability file-transfer-log-query",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability file-transfer-log-query",
           "capability_id": "file-transfer-log-query"
         }
       ],
@@ -743,19 +743,19 @@
       "source_kind": "derived",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability suspicious-operation-summary",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability suspicious-operation-summary",
           "capability_id": "suspicious-operation-summary"
         },
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability failed-login-statistics",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability failed-login-statistics",
           "capability_id": "failed-login-statistics"
         },
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability high-risk-command-audit",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability high-risk-command-audit",
           "capability_id": "high-risk-command-audit"
         },
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability file-transfer-log-query",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability file-transfer-log-query",
           "capability_id": "file-transfer-log-query"
         }
       ],
@@ -778,10 +778,10 @@
       "source_kind": "derived",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type login"
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-list --audit-type login"
         },
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability failed-login-statistics",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability failed-login-statistics",
           "capability_id": "failed-login-statistics"
         }
       ],
@@ -803,11 +803,11 @@
       "source_kind": "derived",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability command-record-query",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability command-record-query",
           "capability_id": "command-record-query"
         },
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability high-risk-command-audit",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability high-risk-command-audit",
           "capability_id": "high-risk-command-audit"
         }
       ],
@@ -829,11 +829,11 @@
       "source_kind": "derived",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability file-transfer-log-query",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability file-transfer-log-query",
           "capability_id": "file-transfer-log-query"
         },
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability file-transfer-heavy-ranking",
+          "entrypoint": "python3 jumpserver-governance-inspection/scripts/jms_diagnose.py inspect --capability file-transfer-heavy-ranking",
           "capability_id": "file-transfer-heavy-ranking"
         }
       ],
@@ -856,18 +856,18 @@
       "source_kind": "derived",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type login"
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-list --audit-type login"
         },
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability high-risk-command-audit",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability high-risk-command-audit",
           "capability_id": "high-risk-command-audit"
         },
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability file-transfer-log-query",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability file-transfer-log-query",
           "capability_id": "file-transfer-log-query"
         },
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability suspicious-operation-summary",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability suspicious-operation-summary",
           "capability_id": "suspicious-operation-summary"
         }
       ],
@@ -890,7 +890,7 @@
       "source_kind": "capability",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability file-transfer-log-query",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability file-transfer-log-query",
           "capability_id": "file-transfer-log-query",
           "output_field": "file_transfer_total"
         }
@@ -908,7 +908,7 @@
       "source_kind": "capability",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability file-transfer-log-query",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability file-transfer-log-query",
           "capability_id": "file-transfer-log-query",
           "output_field": "file_upload_total"
         }
@@ -926,7 +926,7 @@
       "source_kind": "capability",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability file-transfer-log-query",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability file-transfer-log-query",
           "capability_id": "file-transfer-log-query",
           "output_field": "file_download_total"
         }
@@ -944,7 +944,7 @@
       "source_kind": "capability",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability file-transfer-heavy-ranking",
+          "entrypoint": "python3 jumpserver-governance-inspection/scripts/jms_diagnose.py inspect --capability file-transfer-heavy-ranking",
           "capability_id": "file-transfer-heavy-ranking",
           "output_field": "top_users_summary"
         }
@@ -962,7 +962,7 @@
       "source_kind": "capability",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability file-transfer-heavy-ranking",
+          "entrypoint": "python3 jumpserver-governance-inspection/scripts/jms_diagnose.py inspect --capability file-transfer-heavy-ranking",
           "capability_id": "file-transfer-heavy-ranking",
           "output_field": "top_assets_summary"
         }
@@ -980,11 +980,11 @@
       "source_kind": "derived",
       "sources": [
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability file-transfer-log-query",
+          "entrypoint": "python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability file-transfer-log-query",
           "capability_id": "file-transfer-log-query"
         },
         {
-          "entrypoint": "python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability file-transfer-heavy-ranking",
+          "entrypoint": "python3 jumpserver-governance-inspection/scripts/jms_diagnose.py inspect --capability file-transfer-heavy-ranking",
           "capability_id": "file-transfer-heavy-ranking"
         }
       ],

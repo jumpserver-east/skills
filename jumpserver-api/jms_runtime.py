@@ -12,15 +12,17 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
-from .jms_types import JumpServerAPIError, JumpServerConfig, PlatformSpec
+from jms_types import JumpServerAPIError, JumpServerConfig, PlatformSpec
 
 if TYPE_CHECKING:
-    from .jms_api_client import JumpServerClient
-    from .jms_discovery import JumpServerDiscovery
+    from jms_api_client import JumpServerClient
+    from jms_discovery import JumpServerDiscovery
 
 
-SKILL_DIR = Path(__file__).resolve().parents[2]
-LOCAL_ENV_FILE = SKILL_DIR / ".env"
+JUMPSERVER_API_DIR = Path(__file__).resolve().parent
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SKILL_DIR = REPO_ROOT
+LOCAL_ENV_FILE = REPO_ROOT / ".env"
 GLOBAL_ORG_ID = "00000000-0000-0000-0000-000000000000"
 DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000002"
 DEFAULT_PAGE_SIZE = 100
@@ -60,7 +62,7 @@ ORG_LIST_PATH = "/api/v1/orgs/orgs/"
 ORG_CURRENT_PATH = "/api/v1/orgs/orgs/current/"
 USER_PROFILE_PATH = "/api/v1/users/profile/"
 ORG_SELECTION_NEXT_STEP = (
-    "python3 scripts/jumpserver_api/jms_diagnose.py select-org --org-id <org-id> --confirm"
+    "python3 jumpserver-runtime-setup/scripts/jms_diagnose.py select-org --org-id <org-id> --confirm"
 )
 ORG_SELECTION_REQUIRED_REASON_CODE = "organization_selection_required"
 ORG_SELECTION_POLICY = "required_before_query_when_multiple_accessible_orgs"
@@ -69,6 +71,12 @@ INVALID_FILTER_ASSIGNMENT_REASON_CODE = "invalid_filter_assignment"
 CONFIRMATION_REQUIRED_REASON_CODE = "confirmation_required"
 DEPRECATED_PAGINATION_REASON_CODE = "deprecated_pagination_args"
 DEFAULT_TIMEOUT = 30
+ENTRYPOINT_DEFAULT_PATHS = {
+    "jms_query.py": "jumpserver-object-query/scripts/jms_query.py",
+    "jms_diagnose.py": "jumpserver-runtime-setup/scripts/jms_diagnose.py",
+    "jms_report.py": "jumpserver-usage-reporting/scripts/jms_report.py",
+}
+_ENTRYPOINT_OVERRIDE_PATHS: dict[str, str] = {}
 _GLOBAL_ORG_PROBE_ATTEMPTED = False
 _GLOBAL_ORG_PROBE_RESULT: dict[str, Any] | None = None
 
@@ -93,6 +101,42 @@ def parse_bool(value: Any, default: bool = False) -> bool:
     if isinstance(value, bool):
         return value
     return str(value).strip().lower() in {"1", "true", "yes", "on", "y"}
+
+
+def set_entrypoint_override(script_name: str, script_path: str) -> None:
+    clean_name = str(script_name or "").strip()
+    clean_path = str(script_path or "").strip()
+    if clean_name and clean_path:
+        _ENTRYPOINT_OVERRIDE_PATHS[clean_name] = clean_path
+
+
+def entrypoint_path_for(script_name: str) -> str:
+    return _ENTRYPOINT_OVERRIDE_PATHS.get(
+        script_name,
+        ENTRYPOINT_DEFAULT_PATHS.get(script_name, "jumpserver-api/%s" % script_name),
+    )
+
+
+def rewrite_entrypoint_command(command_text: str, script_name: str) -> str:
+    text = str(command_text or "").strip()
+    if not text:
+        return ""
+    pattern = r"^python3\s+\S*%s(?=\s|$)" % re.escape(script_name)
+    return re.sub(pattern, "python3 %s" % entrypoint_path_for(script_name), text, count=1)
+
+
+def rewrite_entrypoint_commands(commands: list[str], script_name: str) -> list[str]:
+    return [
+        rewrite_entrypoint_command(item, script_name)
+        for item in commands
+        if str(item or "").strip()
+    ]
+
+
+def canonical_entrypoint_command(script_name: str, args_text: str = "") -> str:
+    script_path = entrypoint_path_for(script_name)
+    suffix = (" " + args_text.strip()) if str(args_text or "").strip() else ""
+    return "python3 %s%s" % (script_path, suffix)
 
 
 def mask_secret(value: Any) -> str:
@@ -465,9 +509,7 @@ def reject_deprecated_pagination_cli_args(
     cleaned_args = _strip_pagination_tokens(argv)
     suggested_commands: list[str] = []
     if cleaned_args:
-        suggested_commands.append(
-            "python3 scripts/jumpserver_api/%s %s" % (script_name, " ".join(cleaned_args))
-        )
+        suggested_commands.append(canonical_entrypoint_command(script_name, " ".join(cleaned_args)))
     for item in (usage_examples_by_command or {}).get(command, []):
         if item not in suggested_commands:
             suggested_commands.append(item)
@@ -556,7 +598,7 @@ def build_config(*, org_id: str | None = None) -> JumpServerConfig:
 
 
 def create_client(*, org_id: str | None = None) -> JumpServerClient:
-    from .jms_api_client import JumpServerClient
+    from jms_api_client import JumpServerClient
 
     config = build_config(org_id=org_id)
     timeout = current_runtime_values().get("JMS_TIMEOUT")
@@ -567,7 +609,7 @@ def create_client(*, org_id: str | None = None) -> JumpServerClient:
 
 
 def create_discovery(*, org_id: str | None = None) -> JumpServerDiscovery:
-    from .jms_discovery import JumpServerDiscovery
+    from jms_discovery import JumpServerDiscovery
 
     return JumpServerDiscovery(create_client(org_id=org_id))
 
@@ -684,7 +726,7 @@ def build_org_selection_required_payload(context: dict[str, Any]) -> dict[str, A
     if not isinstance(candidate_orgs, list):
         candidate_orgs = []
     suggested_commands = [
-        "python3 scripts/jumpserver_api/jms_diagnose.py select-org --org-id %s --confirm" % str(item.get("id") or "").strip()
+        "python3 jumpserver-runtime-setup/scripts/jms_diagnose.py select-org --org-id %s --confirm" % str(item.get("id") or "").strip()
         for item in candidate_orgs[:3]
         if str(item.get("id") or "").strip()
     ]

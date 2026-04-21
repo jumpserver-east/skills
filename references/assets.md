@@ -3,7 +3,7 @@
 ## 快速概览
 
 - 开始前先到 [runtime.md](runtime.md) 判断本次是“首次全量校验”还是“后续轻量校验”。
-- 主入口：`python3 scripts/jumpserver_api/jms_query.py <subcommand> ...`
+- 主入口：`python3 jumpserver-object-query/scripts/jms_query.py <subcommand> ...`
 - 组织对象也走这个入口：`--resource organization`
 - 这个入口只提供查询：`object-list` 与 `object-get`
 - 所有列表型读取入口默认自动翻页抓取当前查询范围内的全部结果，不再支持 `--limit/--offset`。
@@ -64,27 +64,27 @@
 精确查询用户：
 
 ```bash
-python3 scripts/jumpserver_api/jms_query.py object-list --resource user --name openclaw
+python3 jumpserver-object-query/scripts/jms_query.py object-list --resource user --name openclaw
 ```
 
 查询某类资产：
 
 ```bash
-python3 scripts/jumpserver_api/jms_query.py object-list --resource asset --kind host --name prod --filter is_active=true
-python3 scripts/jumpserver_api/jms_query.py object-list --resource asset --kind database --filter address=192.0.2.12
+python3 jumpserver-object-query/scripts/jms_query.py object-list --resource asset --kind host --name prod --filter is_active=true
+python3 jumpserver-object-query/scripts/jms_query.py object-list --resource asset --kind database --filter address=192.0.2.12
 ```
 
 读取对象详情：
 
 ```bash
-python3 scripts/jumpserver_api/jms_query.py object-get --resource asset --id <asset-id>
-python3 scripts/jumpserver_api/jms_query.py object-get --resource platform --id <platform-id>
-python3 scripts/jumpserver_api/jms_query.py object-get --resource user --id <user-id>
+python3 jumpserver-object-query/scripts/jms_query.py object-get --resource asset --id <asset-id>
+python3 jumpserver-object-query/scripts/jms_query.py object-get --resource platform --id <platform-id>
+python3 jumpserver-object-query/scripts/jms_query.py object-get --resource user --id <user-id>
 ```
 
 读取组织与用户组：
 
 ```bash
-python3 scripts/jumpserver_api/jms_query.py object-list --resource organization --name Default
-python3 scripts/jumpserver_api/jms_query.py object-list --resource user-group --name 运维组
+python3 jumpserver-object-query/scripts/jms_query.py object-list --resource organization --name Default
+python3 jumpserver-object-query/scripts/jms_query.py object-list --resource user-group --name 运维组
 ```

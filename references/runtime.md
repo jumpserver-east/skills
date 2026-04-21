@@ -3,8 +3,8 @@
 ## 快速概览
 
 - 这份文档是所有 `query / diagnose / report` 请求的统一预检入口。
-- 面向用户的正式业务入口固定为 `scripts/jumpserver_api/jms_query.py`、`jms_diagnose.py`、`jms_report.py`；同目录下其余 `jms_*.py` 文件是公共运行时/请求/发现/聚合模块，不作为独立业务入口。
-- 首次运行任一正式入口时，脚本会先按当前解释器环境自动检查 `requirements.txt` 中的依赖；缺失时自动安装，再执行 `python3 scripts/jumpserver_api/jms_diagnose.py config-status --json` 检查本地配置是否完整。
+- 面向用户的正式业务入口固定为各子 skill 下的 `scripts/*.py`；共享实现位于 `jumpserver-api/`，同目录下其余 `jms_*.py` 文件是公共运行时/请求/发现/聚合模块，不作为独立业务入口。
+- 首次运行任一正式入口时，脚本会先按当前解释器环境自动检查 `requirements.txt` 中的依赖；缺失时自动安装，再执行 `python3 jumpserver-runtime-setup/scripts/jms_diagnose.py config-status --json` 检查本地配置是否完整。
 - 若配置不完整，按固定顺序对话收集 `JMS_API_URL -> (JMS_ACCESS_KEY_ID + JMS_ACCESS_KEY_SECRET 或 JMS_USERNAME + JMS_PASSWORD) -> JMS_ORG_ID -> JMS_TIMEOUT -> JMS_VERIFY_TLS`，回显脱敏摘要后执行 `config-write --confirm` 生成本地 `.env`。
 - 预检分两级：当前解释器环境缺依赖时先做依赖自愈 + 全量校验，依赖已就绪的后续请求做轻量校验。
 - 若未指定 `JMS_ORG_ID`，运行时先读取当前环境全部可访问组织；默认不自动代选组织。
@@ -52,9 +52,9 @@ python3 -m pip install -r requirements.txt
 ### 3. 本地配置状态检查
 
 ```text
-python3 scripts/jumpserver_api/jms_diagnose.py config-status --json
+python3 jumpserver-runtime-setup/scripts/jms_diagnose.py config-status --json
   -> complete=true: 继续全量校验
-  -> complete=false: 查看 missing_fields / invalid_fields -> 对话收集配置 -> 脱敏确认 -> python3 scripts/jumpserver_api/jms_diagnose.py config-write --payload '<json>' --confirm
+  -> complete=false: 查看 missing_fields / invalid_fields -> 对话收集配置 -> 脱敏确认 -> python3 jumpserver-runtime-setup/scripts/jms_diagnose.py config-write --payload '<json>' --confirm
 ```
 
 说明：
@@ -76,7 +76,7 @@ python3 scripts/jumpserver_api/jms_diagnose.py config-status --json
 ### 5. 连通性进入检查
 
 ```text
-python3 scripts/jumpserver_api/jms_diagnose.py ping
+python3 jumpserver-runtime-setup/scripts/jms_diagnose.py ping
   -> 进入 query / diagnose / report
 ```
 
@@ -84,8 +84,8 @@ python3 scripts/jumpserver_api/jms_diagnose.py ping
 
 | 步骤 | 检查内容 | 通过标准 |
 |---|---|---|
-| 本地配置状态 | `python3 scripts/jumpserver_api/jms_diagnose.py config-status --json` | `complete=true` |
-| 连通性 | `python3 scripts/jumpserver_api/jms_diagnose.py ping` | 返回可连接结果 |
+| 本地配置状态 | `python3 jumpserver-runtime-setup/scripts/jms_diagnose.py config-status --json` | `complete=true` |
+| 连通性 | `python3 jumpserver-runtime-setup/scripts/jms_diagnose.py ping` | 返回可连接结果 |
 
 ## 组织选择与保留组织特判
 
@@ -111,10 +111,16 @@ python3 scripts/jumpserver_api/jms_diagnose.py ping
 
 | 入口 | 用途 |
 |---|---|
-| `python3 scripts/jumpserver_api/jms_diagnose.py config-status --json` | 查看当前本地配置状态 |
-| `python3 scripts/jumpserver_api/jms_diagnose.py config-write --payload '<json>' --confirm` | 生成或覆盖本地 `.env` |
-| `python3 scripts/jumpserver_api/jms_diagnose.py select-org --org-id <org-id> --confirm` | 显式选择组织并写回 `JMS_ORG_ID` |
-| `python3 scripts/jumpserver_api/jms_diagnose.py select-org --org-name <org-name>` | 先按组织名称预览切换范围，不写回 `.env` |
-| `python3 scripts/jumpserver_api/jms_query.py ...` | 对象查询、权限查询、审计查询的统一入口 |
-| `python3 scripts/jumpserver_api/jms_diagnose.py ...` | 连通性、解析、访问分析、设置/许可证/报表/工单/存储查询、巡检与治理分析 |
-| `python3 scripts/jumpserver_api/jms_report.py ...` | 模板化报告生成与契约检查 |
+| `python3 jumpserver-runtime-setup/scripts/jms_diagnose.py config-status --json` | 查看当前本地配置状态 |
+| `python3 jumpserver-runtime-setup/scripts/jms_diagnose.py config-write --payload '<json>' --confirm` | 生成或覆盖本地 `.env` |
+| `python3 jumpserver-runtime-setup/scripts/jms_diagnose.py select-org --org-id <org-id> --confirm` | 显式选择组织并写回 `JMS_ORG_ID` |
+| `python3 jumpserver-runtime-setup/scripts/jms_diagnose.py select-org --org-name <org-name>` | 先按组织名称预览切换范围，不写回 `.env` |
+| `python3 jumpserver-object-query/scripts/jms_query.py ...` | 对象查询入口 |
+| `python3 jumpserver-effective-access/scripts/jms_diagnose.py ...` | 用户有效访问范围入口 |
+| `python3 jumpserver-permission-analysis/scripts/jms_query.py ...` | 权限列表、ACL、RBAC 与资产授权用户入口 |
+| `python3 jumpserver-permission-analysis/scripts/jms_diagnose.py ...` | 资产权限命中解释入口 |
+| `python3 jumpserver-audit-investigation/scripts/jms_query.py ...` | 审计明细、terminal 会话、命令存储提示与 capability 审计入口 |
+| `python3 jumpserver-audit-investigation/scripts/jms_diagnose.py ...` | 最近审计快捷查询入口 |
+| `python3 jumpserver-governance-inspection/scripts/jms_diagnose.py ...` | 设置、许可证、工单、存储、报表与治理巡检入口 |
+| `python3 jumpserver-runtime-setup/scripts/jms_diagnose.py ...` | 配置、预检、组织切换、对象解析与端点验证入口 |
+| `python3 jumpserver-usage-reporting/scripts/jms_report.py ...` | 模板化报告生成与契约检查 |

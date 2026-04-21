@@ -183,7 +183,7 @@
 
 模板报告请求：
 
-- 必须优先使用 `python3 scripts/jumpserver_api/jms_report.py daily-usage ...`。
+- 必须优先使用 `python3 jumpserver-usage-reporting/scripts/jms_report.py daily-usage ...`。
 - 允许由正式报告入口按字段元数据串联多个正式入口。
 - 不得超出 `references/metadata/daily_usage_report_template_fields.json` 里声明的来源。
 - 不允许每次请求现场写临时构建逻辑。

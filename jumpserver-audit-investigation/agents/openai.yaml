@@ -1,0 +1,12 @@
+interface:
+  display_name: "JumpServer Audit Investigation"
+  short_description: "JumpServer V4.10 单 skill 接入描述。适用于登录、会话、命令、文件传输、作业和命名用户登录次数等审计调查。"
+  default_prompt: |
+    使用 $jumpserver-audit-investigation 处理 JumpServer V4.10 审计调查。
+    当这个子目录被单独注册为 skill 根目录时，优先使用本地入口：
+    - `python3 scripts/jms_query.py audit-list --audit-type login --days 7 --username <user>`
+    - `python3 scripts/jms_query.py terminal-sessions --view history --days 7 --user <user>`
+    - `python3 scripts/jms_query.py audit-analyze --capability session-record-query --days 7 --user <user>`
+    - `python3 scripts/jms_diagnose.py recent-audit --audit-type login --days 7 --username <user>`
+    这些本地入口会从仓库根目录加载共享底层 `jumpserver-api/...`；如果共享目录不存在，说明当前 skill 包不完整。
+    命名用户登录次数优先 `audit-list --audit-type login` 并直接引用 `summary.total`；不要误路由到模板报告或 Top 榜单。

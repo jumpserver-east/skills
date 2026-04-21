@@ -7,8 +7,8 @@ import json
 import re
 from typing import Any
 
-from .jms_capabilities import CAPABILITY_BY_ID
-from .jms_runtime import (
+from jms_capabilities import CAPABILITY_BY_ID
+from jms_runtime import (
     CLIError,
     build_cli_guidance_payload,
     create_client,
@@ -3398,7 +3398,7 @@ def setting_category_query(filters: dict[str, Any]) -> dict[str, Any]:
             payload=build_cli_guidance_payload(
                 "missing_setting_category",
                 user_message="请通过 `--category` 指定要查询的设置分类，例如 `security_auth`。",
-                action_hint="推荐使用 `python3 scripts/jumpserver_api/jms_diagnose.py settings-category --category security_auth`。",
+                action_hint="推荐使用 `python3 jumpserver-governance-inspection/scripts/jms_diagnose.py settings-category --category security_auth`。",
             ),
         )
     payload = _settings_payload(category=category, setting_id=setting_id or None)
@@ -3772,7 +3772,7 @@ def report_query(filters: dict[str, Any]) -> dict[str, Any]:
             payload=build_cli_guidance_payload(
                 "missing_report_type",
                 user_message="请通过 `--report-type` 指定要读取的报表类型。",
-                action_hint="推荐使用 `python3 scripts/jumpserver_api/jms_diagnose.py reports --report-type account-statistic --days 30`。",
+                action_hint="推荐使用 `python3 jumpserver-governance-inspection/scripts/jms_diagnose.py reports --report-type account-statistic --days 30`。",
             ),
         )
     path = REPORT_PATHS.get(report_type)
@@ -3782,7 +3782,7 @@ def report_query(filters: dict[str, Any]) -> dict[str, Any]:
             payload=build_cli_guidance_payload(
                 "unsupported_report_type",
                 user_message="当前 `--report-type` 不在支持列表中，请改用帮助页里列出的类型。",
-                action_hint="可先执行 `python3 scripts/jumpserver_api/jms_diagnose.py reports --help` 查看支持值。",
+                action_hint="可先执行 `python3 jumpserver-governance-inspection/scripts/jms_diagnose.py reports --help` 查看支持值。",
                 report_type=report_type,
             ),
         )

@@ -1,0 +1,11 @@
+interface:
+  display_name: "JumpServer Effective Access"
+  short_description: "JumpServer V4.10 单 skill 接入描述。适用于查询某个用户当前实际能访问哪些资产、节点、账号和协议。"
+  default_prompt: |
+    使用 $jumpserver-effective-access 处理 JumpServer V4.10 用户有效访问范围问题。
+    当这个子目录被单独注册为 skill 根目录时，优先使用本地入口：
+    - `python3 scripts/jms_diagnose.py user-assets --username <user>`
+    - `python3 scripts/jms_diagnose.py user-nodes --username <user>`
+    - `python3 scripts/jms_diagnose.py user-asset-access --username <user> --asset-name <asset>`
+    这些本地入口会从仓库根目录加载共享底层 `jumpserver-api/...`；如果共享目录不存在，说明当前 skill 包不完整。
+    结果型问法优先返回有效访问范围，不回退成授权规则说明。用户显式给组织时，优先在单次命令内用 `--org-id` 或 `--org-name` 限定组织。

@@ -2,7 +2,7 @@
 
 ## 快速概览
 
-- 主入口：`python3 scripts/jumpserver_api/jms_query.py <subcommand> ...`
+- 主入口：`python3 jumpserver-object-query/scripts/jms_query.py <subcommand> ...`
 - 常用子命令：`audit-list`、`audit-get`、`terminal-sessions`、`job-list`、`command-storage-hint`、`audit-analyze`、`capabilities`。
 - 页面型查询优先使用显式参数；低频页面字段再用 `--filter key=value`。
 - 列表型和分析型命令默认会自动翻页，抓取并返回查询范围内的全部结果，不再支持 `--limit/--offset`。
@@ -69,50 +69,50 @@
 最近登录审计：
 
 ```bash
-python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type login
-python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type login --days 30 --username 示例用户(example.user)
-python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type login --days 30 --username 示例用户(example.user) --status 1
+python3 jumpserver-audit-investigation/scripts/jms_query.py audit-list --audit-type login
+python3 jumpserver-audit-investigation/scripts/jms_query.py audit-list --audit-type login --days 30 --username 示例用户(example.user)
+python3 jumpserver-audit-investigation/scripts/jms_query.py audit-list --audit-type login --days 30 --username 示例用户(example.user) --status 1
 ```
 
 最近操作日志：
 
 ```bash
-python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type operate --days 30 --user example.user --action 创建 --resource-type 'User session'
+python3 jumpserver-audit-investigation/scripts/jms_query.py audit-list --audit-type operate --days 30 --user example.user --action 创建 --resource-type 'User session'
 ```
 
 改密日志与作业日志：
 
 ```bash
-python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type password_change --days 30 --user 示例管理员(admin.user) --change-by 示例用户(example.user) --remote-addr 203.0.113.10
-python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type jobs --days 30 --creator-name 示例用户 --material 'shell:ls'
+python3 jumpserver-audit-investigation/scripts/jms_query.py audit-list --audit-type password_change --days 30 --user 示例管理员(admin.user) --change-by 示例用户(example.user) --remote-addr 203.0.113.10
+python3 jumpserver-audit-investigation/scripts/jms_query.py audit-list --audit-type jobs --days 30 --creator-name 示例用户 --material 'shell:ls'
 ```
 
 会话记录与作业列表：
 
 ```bash
-python3 scripts/jumpserver_api/jms_query.py terminal-sessions --view history --days 7 --user example.user --login-from WT
-python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type terminal-session --days 7 --asset demo-host --protocol ssh
-python3 scripts/jumpserver_api/jms_query.py job-list --name 删除Windows用户
+python3 jumpserver-audit-investigation/scripts/jms_query.py terminal-sessions --view history --days 7 --user example.user --login-from WT
+python3 jumpserver-audit-investigation/scripts/jms_query.py audit-list --audit-type terminal-session --days 7 --asset demo-host --protocol ssh
+python3 jumpserver-audit-investigation/scripts/jms_query.py job-list --name 删除Windows用户
 ```
 
 某用户某天连接过哪些机器：
 
 ```bash
-python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability session-record-query --user 示例用户 --date-from '2026-03-23 00:00:00' --date-to '2026-03-23 23:59:59'
+python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability session-record-query --user 示例用户 --date-from '2026-03-23 00:00:00' --date-to '2026-03-23 23:59:59'
 ```
 
 高危命令审计：
 
 ```bash
-python3 scripts/jumpserver_api/jms_query.py command-storage-hint
-python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability high-risk-command-audit --date-from '2026-03-01 00:00:00' --date-to '2026-03-20 23:59:59' --command-storage-id '<storage-id>'
+python3 jumpserver-audit-investigation/scripts/jms_query.py command-storage-hint
+python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability high-risk-command-audit --date-from '2026-03-01 00:00:00' --date-to '2026-03-20 23:59:59' --command-storage-id '<storage-id>'
 ```
 
 文件传输与命令记录分析：
 
 ```bash
-python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability file-transfer-log-query --direction upload --date-from '2026-03-01 00:00:00' --date-to '2026-03-20 23:59:59'
-python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability command-record-query --date-from '2026-03-01 00:00:00' --date-to '2026-03-20 23:59:59' --command-storage-scope all
+python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability file-transfer-log-query --direction upload --date-from '2026-03-01 00:00:00' --date-to '2026-03-20 23:59:59'
+python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability command-record-query --date-from '2026-03-01 00:00:00' --date-to '2026-03-20 23:59:59' --command-storage-scope all
 ```
 
 ## 统计口径与常见误区

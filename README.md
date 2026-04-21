@@ -1,8 +1,8 @@
 # JumpServer Skills
 
-`jumpserver-skills` 是一个面向 JumpServer V4.10 的查询、审计分析与模板化使用报告 skill 仓库，适用于对象查询、权限回看、审计调查、治理巡检、访问分析，以及某一天或某一段时间的堡垒机使用报告。它更像一套可复用的 skill 规则与正式入口封装，而不是要求使用者手动拼接脚本命令的 CLI 教程。
+`jumpserver-skills` 是一个面向 JumpServer V4.10 的 skill 仓库。当前结构已经从单个大而全 skill，拆成“1 个总路由 skill + 多个按用户意图划分的子 skills + 共享运行时”。它仍然适用于对象查询、权限回看、审计调查、治理巡检、访问分析，以及某一天或某一段时间的堡垒机使用报告，但现在触发边界更窄、维护成本也更低。
 
-仓库内部会按请求类型自动路由到 `jms_query.py`、`jms_diagnose.py`、`jms_report.py` 三类正式入口。默认保持只读，仅允许本地运行时写入 `.env` 和当前组织上下文，不执行 JumpServer 业务写操作。
+仓库内部仍然统一复用 `jms_query.py`、`jms_diagnose.py`、`jms_report.py` 三类正式入口。默认保持只读，仅允许本地运行时写入 `.env` 和当前组织上下文，不执行 JumpServer 业务写操作。
 
 [English](./README.en.md)
 
@@ -26,6 +26,29 @@
 | 治理巡检 | 资产治理、账号治理、访问分析、系统巡检、capability 聚合分析 | `jms_diagnose.py` | 优先走能力化聚合，而不是让使用者手工拼零散查询 |
 | 使用报告 | 日报、使用情况、使用分析、某天发生了什么、某时间段排行或概览 | `jms_report.py` | 这类请求默认输出完整 HTML 报告，而不是只给一句摘要 |
 
+## 子 skill 结构
+
+仓库现在保留根目录 [SKILL.md](./SKILL.md) 作为兼容旧入口的总路由 skill，同时新增 7 个按用户意图拆分的子 skill：
+
+| 子 skill | 负责意图 | 主要入口 |
+|---|---|---|
+| `jumpserver-runtime-setup` | 配置、预检、连通性、组织切换、执行上下文排障 | `jms_diagnose.py` |
+| `jumpserver-object-query` | 资产、账号、用户、组织、平台、节点、标签、网域查询 | `jms_query.py` |
+| `jumpserver-effective-access` | 某用户实际能访问哪些资产、节点、账号、协议 | `jms_diagnose.py` |
+| `jumpserver-permission-analysis` | 授权规则、ACL、RBAC、为什么能访问、资产授权给了谁 | `jms_query.py` / `jms_diagnose.py` |
+| `jumpserver-audit-investigation` | 登录、会话、命令、文件传输、作业、命名用户登录次数 | `jms_query.py` / `jms_diagnose.py` |
+| `jumpserver-usage-reporting` | 某天或某时间段的使用情况、排行、概览、HTML 报告 | `jms_report.py` |
+| `jumpserver-governance-inspection` | capability 聚合、系统设置、许可证、工单、存储、治理巡检 | `jms_diagnose.py` |
+
+共享部分没有拆散：真正复用的底层模块现在位于 `jumpserver-api/`，`references/` 继续承载规则文档，`template/` 继续承载 HTML 报告模板。
+
+为了适配“一次只能注册一个 skill”的宿主，每个子 skill 目录现在还额外带了两类轻量文件：
+
+- `agents/openai.yaml`：该子 skill 的独立接入描述
+- `scripts/*.py`：各子 skill 的本地入口脚本，直接加载 `jumpserver-api/`，不再把 `jumpserver-runtime-setup` 当成全部 Python 代码的宿主
+
+也就是说，如果宿主不适合直接注册根目录总路由 skill，可以直接把某个 `jumpserver-*` 子目录当成 skill 根目录来接。
+
 ## 怎么使用这个 skill
 
 1. 准备环境文件。在仓库根目录创建 `.env`，有两种方式：
@@ -43,11 +66,13 @@ cp .env.example .env
 - “帮我生成 `.env`，JumpServer 地址是 `https://jump.example.com`，我用 AK/SK 登录。”
 - “帮我初始化 JumpServer 配置，我用用户名密码登录，不校验证书。”
 
-2. 把这个 skill 接到你的 agent 或 Codex 环境里使用。仓库中的 [agents/openai.yaml](./agents/openai.yaml) 提供了一个现成的 skill 接入描述，可作为引用或注册该 skill 的入口之一。
+2. 把这个 skill 接到你的 agent 或 Codex 环境里使用。仓库中的 [agents/openai.yaml](./agents/openai.yaml) 提供的是总路由 skill 的接入描述。
 
-3. 直接用自然语言描述需求，不需要手动拼接脚本命令。例如“查某某用户在 Default 组织下有哪些资产”“看看昨天使用情况”“看某条授权规则详情”。
+3. 如果你的运行环境支持多 skill 发现，优先直接触发更窄的子 skill；如果宿主一次只能注册一个 skill，也可以直接注册某个 `jumpserver-*` 子目录，并使用它自己的 `agents/openai.yaml`。
 
-4. 根据返回结果继续补充上下文。如果结果提示 `candidate_orgs`、`switchable_orgs`、候选对象或缺少时间范围，就按提示补充组织、对象名称、平台或时间窗口。组织必须先选时，返回里还会带 `reason_code`、`user_message`、`action_hint`、`suggested_commands` 和 `candidate_org_count`，方便直接按提示继续。
+4. 直接用自然语言描述需求，不需要手动拼接脚本命令。例如“查某某用户在 Default 组织下有哪些资产”“看看昨天使用情况”“看某条授权规则详情”。
+
+5. 根据返回结果继续补充上下文。如果结果提示 `candidate_orgs`、`switchable_orgs`、候选对象或缺少时间范围，就按提示补充组织、对象名称、平台或时间窗口。组织必须先选时，返回里还会带 `reason_code`、`user_message`、`action_hint`、`suggested_commands` 和 `candidate_org_count`，方便直接按提示继续。
 
 使用时不需要记住具体执行命令。这个 skill 会先做预检，再按路由规则自动选择正式入口，并在需要时提示你补充组织、对象或时间范围。
 
@@ -62,19 +87,19 @@ cp .env.example .env
 推荐写法：
 
 ```bash
-python3 scripts/jumpserver_api/jms_diagnose.py select-org --org-name Default
-python3 scripts/jumpserver_api/jms_diagnose.py user-assets --org-name Default --username example.user
-python3 scripts/jumpserver_api/jms_query.py object-list --resource organization --name Default
-python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability session-record-query --days 7 --user example.user
-python3 scripts/jumpserver_api/jms_diagnose.py inspect --capability hot-assets-ranking --days 30 --top 10
-python3 scripts/jumpserver_api/jms_diagnose.py reports --report-type account-statistic --days 30
+python3 jumpserver-runtime-setup/scripts/jms_diagnose.py select-org --org-name Default
+python3 jumpserver-effective-access/scripts/jms_diagnose.py user-assets --org-name Default --username example.user
+python3 jumpserver-object-query/scripts/jms_query.py object-list --resource organization --name Default
+python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability session-record-query --days 7 --user example.user
+python3 jumpserver-governance-inspection/scripts/jms_diagnose.py inspect --capability hot-assets-ranking --days 30 --top 10
+python3 jumpserver-governance-inspection/scripts/jms_diagnose.py reports --report-type account-statistic --days 30
 ```
 
 兼容写法：
 
 ```bash
-python3 scripts/jumpserver_api/jms_query.py object-list --resource organization --filters '{"name":"Default"}'
-python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability session-record-query --filter user=example.user --filter days=7
+python3 jumpserver-object-query/scripts/jms_query.py object-list --resource organization --filters '{"name":"Default"}'
+python3 jumpserver-audit-investigation/scripts/jms_query.py audit-analyze --capability session-record-query --filter user=example.user --filter days=7
 ```
 
 列表型和分析型命令默认会自动翻页抓取并返回查询范围内的全部结果，不再支持 `--limit/--offset`。
@@ -219,8 +244,16 @@ python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability session-r
 
 | 文件 | 用途 |
 |---|---|
-| [SKILL.md](./SKILL.md) | skill 的顶部路由规则、组织优先级与响应约束 |
+| [SKILL.md](./SKILL.md) | 总路由 skill，负责高层意图路由、共享边界和兼容旧入口 |
 | [agents/openai.yaml](./agents/openai.yaml) | skill 接入描述与默认提示词入口 |
+| [jumpserver-runtime-setup/SKILL.md](./jumpserver-runtime-setup/SKILL.md) | 配置、预检、组织切换与执行上下文子 skill |
+| [jumpserver-object-query/SKILL.md](./jumpserver-object-query/SKILL.md) | 对象查询子 skill |
+| [jumpserver-effective-access/SKILL.md](./jumpserver-effective-access/SKILL.md) | 用户有效访问范围子 skill |
+| [jumpserver-permission-analysis/SKILL.md](./jumpserver-permission-analysis/SKILL.md) | 权限与授权分析子 skill |
+| [jumpserver-audit-investigation/SKILL.md](./jumpserver-audit-investigation/SKILL.md) | 审计调查子 skill |
+| [jumpserver-usage-reporting/SKILL.md](./jumpserver-usage-reporting/SKILL.md) | 使用报告与 HTML 模板报告子 skill |
+| [jumpserver-governance-inspection/SKILL.md](./jumpserver-governance-inspection/SKILL.md) | 治理巡检与 capability 聚合子 skill |
+| [references/single-skill-registration.md](./references/single-skill-registration.md) | 宿主一次只能注册一个 skill 时的接入方式 |
 | [references/routing-playbook.md](./references/routing-playbook.md) | 普通路由、典型触发词、阻塞规则与反例 |
 | [references/report-template-playbook.md](./references/report-template-playbook.md) | 模板化报告流程、组织优先级、时间范围与报告规则 |
 | [references/runtime.md](./references/runtime.md) | 预检流程、环境变量模型、组织选择与运行时约束 |

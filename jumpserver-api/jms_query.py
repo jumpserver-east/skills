@@ -5,16 +5,16 @@ if __package__ in {None, ""}:
     import sys
     from pathlib import Path
 
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from jumpserver_api.jms_bootstrap import ensure_requirements_installed
+from jms_bootstrap import ensure_requirements_installed
 
 ensure_requirements_installed()
 
 import argparse
 import sys
 
-from jumpserver_api.jms_analytics import (
+from jms_analytics import (
     _apply_common_filters,
     _asset_filter_evidence,
     _exact_first_filter,
@@ -36,7 +36,7 @@ from jumpserver_api.jms_analytics import (
     resolve_command_storage_context,
     run_capability,
 )
-from jumpserver_api.jms_runtime import (
+from jms_runtime import (
     CLIError,
     CLIHelpFormatter,
     add_filter_arguments,
@@ -47,6 +47,7 @@ from jumpserver_api.jms_runtime import (
     org_context_output,
     parse_bool,
     reject_deprecated_pagination_cli_args,
+    rewrite_entrypoint_commands,
     run_and_print,
 )
 
@@ -138,38 +139,107 @@ COMMAND_AUDIT_CAPABILITIES = {
 }
 
 OBJECT_LIST_EXAMPLES = [
-    "python3 scripts/jumpserver_api/jms_query.py object-list --resource organization --name Default",
-    "python3 scripts/jumpserver_api/jms_query.py object-list --resource asset --kind host --search prod",
+    "python3 jumpserver-object-query/scripts/jms_query.py object-list --resource organization --name Default",
+    "python3 jumpserver-object-query/scripts/jms_query.py object-list --resource asset --kind host --search prod",
 ]
 PERMISSION_LIST_EXAMPLES = [
-    "python3 scripts/jumpserver_api/jms_query.py permission-list --resource asset-permission --name 生产环境授权",
-    "python3 scripts/jumpserver_api/jms_query.py permission-list --resource asset-permission --filter users=example.user",
+    "python3 jumpserver-object-query/scripts/jms_query.py permission-list --resource asset-permission --name 生产环境授权",
+    "python3 jumpserver-object-query/scripts/jms_query.py permission-list --resource asset-permission --filter users=example.user",
 ]
 ASSET_PERM_USERS_EXAMPLES = [
-    "python3 scripts/jumpserver_api/jms_query.py asset-perm-users --asset-id <asset-id>",
+    "python3 jumpserver-object-query/scripts/jms_query.py asset-perm-users --asset-id <asset-id>",
 ]
 AUDIT_LIST_EXAMPLES = [
-    "python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type login --days 30 --username 示例用户(example.user)",
-    "python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type login --days 30 --username 示例用户(example.user) --status 1",
-    "python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type terminal-session --days 7 --user example.user --asset demo-host --protocol ssh",
-    "python3 scripts/jumpserver_api/jms_query.py audit-list --audit-type operate --days 30 --user example.user --action 创建 --resource-type 'User session'",
+    "python3 jumpserver-object-query/scripts/jms_query.py audit-list --audit-type login --days 30 --username 示例用户(example.user)",
+    "python3 jumpserver-object-query/scripts/jms_query.py audit-list --audit-type login --days 30 --username 示例用户(example.user) --status 1",
+    "python3 jumpserver-object-query/scripts/jms_query.py audit-list --audit-type terminal-session --days 7 --user example.user --asset demo-host --protocol ssh",
+    "python3 jumpserver-object-query/scripts/jms_query.py audit-list --audit-type operate --days 30 --user example.user --action 创建 --resource-type 'User session'",
 ]
 TERMINAL_SESSION_EXAMPLES = [
-    "python3 scripts/jumpserver_api/jms_query.py terminal-sessions --view history --days 7 --user example.user",
-    "python3 scripts/jumpserver_api/jms_query.py terminal-sessions --view online --asset demo-host --protocol ssh",
+    "python3 jumpserver-object-query/scripts/jms_query.py terminal-sessions --view history --days 7 --user example.user",
+    "python3 jumpserver-object-query/scripts/jms_query.py terminal-sessions --view online --asset demo-host --protocol ssh",
 ]
 JOB_LIST_EXAMPLES = [
-    "python3 scripts/jumpserver_api/jms_query.py job-list --name 删除Windows用户",
-    "python3 scripts/jumpserver_api/jms_query.py job-list --search shell",
+    "python3 jumpserver-object-query/scripts/jms_query.py job-list --name 删除Windows用户",
+    "python3 jumpserver-object-query/scripts/jms_query.py job-list --search shell",
 ]
 COMMAND_STORAGE_HINT_EXAMPLES = [
-    "python3 scripts/jumpserver_api/jms_query.py command-storage-hint",
-    "python3 scripts/jumpserver_api/jms_query.py command-storage-hint --command-storage-id <storage-id>",
+    "python3 jumpserver-object-query/scripts/jms_query.py command-storage-hint",
+    "python3 jumpserver-object-query/scripts/jms_query.py command-storage-hint --command-storage-id <storage-id>",
 ]
 AUDIT_ANALYZE_EXAMPLES = [
-    "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability session-record-query --days 7 --user example.user",
-    "python3 scripts/jumpserver_api/jms_query.py audit-analyze --capability command-record-query --date-from '2026-03-01 00:00:00' --date-to '2026-03-20 23:59:59' --command-storage-scope all",
+    "python3 jumpserver-object-query/scripts/jms_query.py audit-analyze --capability session-record-query --days 7 --user example.user",
+    "python3 jumpserver-object-query/scripts/jms_query.py audit-analyze --capability command-record-query --date-from '2026-03-01 00:00:00' --date-to '2026-03-20 23:59:59' --command-storage-scope all",
 ]
+QUERY_COMMAND_EXAMPLES = {
+    "object-list": OBJECT_LIST_EXAMPLES,
+    "permission-list": PERMISSION_LIST_EXAMPLES,
+    "asset-perm-users": ASSET_PERM_USERS_EXAMPLES,
+    "audit-list": AUDIT_LIST_EXAMPLES,
+    "terminal-sessions": TERMINAL_SESSION_EXAMPLES,
+    "job-list": JOB_LIST_EXAMPLES,
+    "command-storage-hint": COMMAND_STORAGE_HINT_EXAMPLES,
+    "audit-analyze": AUDIT_ANALYZE_EXAMPLES,
+}
+QUERY_PROFILE_SETTINGS = {
+    "all": {
+        "description": "JumpServer 统一只读查询入口。",
+        "commands": {
+            "object-list",
+            "object-get",
+            "permission-list",
+            "permission-get",
+            "asset-perm-users",
+            "audit-list",
+            "audit-get",
+            "terminal-sessions",
+            "job-list",
+            "command-storage-hint",
+            "audit-analyze",
+            "capabilities",
+        },
+    },
+    "object-query": {
+        "description": "JumpServer 对象查询入口。",
+        "commands": {"object-list", "object-get"},
+    },
+    "permission-analysis": {
+        "description": "JumpServer 权限与授权分析入口。",
+        "commands": {"permission-list", "permission-get", "asset-perm-users"},
+    },
+    "audit-investigation": {
+        "description": "JumpServer 审计调查入口。",
+        "commands": {
+            "audit-list",
+            "audit-get",
+            "terminal-sessions",
+            "job-list",
+            "command-storage-hint",
+            "audit-analyze",
+            "capabilities",
+        },
+    },
+}
+QUERY_COMMON_EPILOG = (
+    "推荐路径:\n"
+    "  1. 优先使用显式参数，例如 --name、--days、--user\n"
+    "  2. 高级补充筛选使用重复的 --filter key=value\n"
+    "  3. 只有兼容旧命令时再使用 --filters '{\"key\": \"value\"}'"
+)
+
+
+def _query_usage_examples(command: str) -> list[str]:
+    return rewrite_entrypoint_commands(QUERY_COMMAND_EXAMPLES.get(command, []), "jms_query.py")
+
+
+def _query_profile_settings(profile: str) -> dict[str, object]:
+    return QUERY_PROFILE_SETTINGS.get(profile, QUERY_PROFILE_SETTINGS["all"])
+
+
+def _query_profile_commands(profile: str) -> set[str]:
+    return set(_query_profile_settings(profile)["commands"])
+
+
 AUDIT_STRATEGY_FIELDS = {
     "operate": (
         ("user", "server_user_exact"),
@@ -402,7 +472,7 @@ def _object_list(args: argparse.Namespace):
         args,
         explicit_fields=("name", "search"),
         forbidden_fields=("limit", "offset"),
-        usage_examples=OBJECT_LIST_EXAMPLES,
+        usage_examples=_query_usage_examples("object-list"),
     )
     path = _object_list_path(args.resource, args.kind)
     records = client.list_paginated(path, params=filters)
@@ -509,7 +579,7 @@ def _permission_list(args: argparse.Namespace):
         args,
         explicit_fields=("name", "search", "user", "user_id", "users", "is_expired"),
         forbidden_fields=("limit", "offset"),
-        usage_examples=PERMISSION_LIST_EXAMPLES,
+        usage_examples=_query_usage_examples("permission-list"),
     )
     if args.resource != "asset-permission":
         filters.pop("user_id", None)
@@ -695,7 +765,7 @@ def _audit_list(args: argparse.Namespace):
                 "command_storage_scope",
             ),
             forbidden_fields=("limit", "offset"),
-            usage_examples=AUDIT_LIST_EXAMPLES,
+            usage_examples=_query_usage_examples("audit-list"),
         ),
     )
     filters = _normalize_time_filters(filters, default_days=7)
@@ -886,7 +956,7 @@ def _audit_analyze(args: argparse.Namespace):
                 "top",
             ),
             forbidden_fields=("limit", "offset"),
-            usage_examples=AUDIT_ANALYZE_EXAMPLES,
+            usage_examples=_query_usage_examples("audit-analyze"),
         )
     )
     effective_filters = dict(filters)
@@ -916,7 +986,7 @@ def _audit_analyze(args: argparse.Namespace):
 
 
 def _audit_capabilities(_: argparse.Namespace):
-    from jumpserver_api.jms_capabilities import CAPABILITIES
+    from jms_capabilities import CAPABILITIES
 
     return [
         {
@@ -931,15 +1001,12 @@ def _audit_capabilities(_: argparse.Namespace):
     ]
 
 
-def build_parser() -> argparse.ArgumentParser:
+def build_parser(profile: str = "all") -> argparse.ArgumentParser:
+    profile_settings = _query_profile_settings(profile)
+    enabled_commands = set(profile_settings["commands"])
     parser = argparse.ArgumentParser(
-        description="JumpServer 统一只读查询入口。",
-        epilog=(
-            "推荐路径:\n"
-            "  1. 优先使用显式参数，例如 --name、--days、--user\n"
-            "  2. 高级补充筛选使用重复的 --filter key=value\n"
-            "  3. 只有兼容旧命令时再使用 --filters '{\"key\": \"value\"}'"
-        ),
+        description=str(profile_settings["description"]),
+        epilog=QUERY_COMMON_EPILOG,
         formatter_class=CLIHelpFormatter,
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -958,198 +1025,212 @@ def build_parser() -> argparse.ArgumentParser:
     ]
     permission_resources = sorted(PERMISSION_RESOURCE_PATHS)
 
-    object_list = subparsers.add_parser(
-        "object-list",
-        help="按资源类型列出对象。",
-        description="列出资产、节点、平台、账号、用户、组织等对象。",
-        epilog="Examples:\n  " + "\n  ".join(OBJECT_LIST_EXAMPLES),
-        formatter_class=CLIHelpFormatter,
-    )
-    object_list.add_argument("--resource", required=True, choices=object_resources)
-    object_list.add_argument("--kind", help="仅当 --resource asset 时可选，用于限定资产子类型。")
-    object_list.add_argument("--name", help="按名称精确优先匹配。")
-    object_list.add_argument("--search", help="服务端搜索关键字。")
-    add_filter_arguments(object_list)
-    object_list.set_defaults(func=_object_list)
+    if "object-list" in enabled_commands:
+        object_list = subparsers.add_parser(
+            "object-list",
+            help="按资源类型列出对象。",
+            description="列出资产、节点、平台、账号、用户、组织等对象。",
+            epilog="Examples:\n  " + "\n  ".join(_query_usage_examples("object-list")),
+            formatter_class=CLIHelpFormatter,
+        )
+        object_list.add_argument("--resource", required=True, choices=object_resources)
+        object_list.add_argument("--kind", help="仅当 --resource asset 时可选，用于限定资产子类型。")
+        object_list.add_argument("--name", help="按名称精确优先匹配。")
+        object_list.add_argument("--search", help="服务端搜索关键字。")
+        add_filter_arguments(object_list)
+        object_list.set_defaults(func=_object_list)
 
-    object_get = subparsers.add_parser(
-        "object-get",
-        help="按 ID 读取单个对象详情。",
-        description="按资源类型和 ID 读取单个对象详情。",
-        formatter_class=CLIHelpFormatter,
-    )
-    object_get.add_argument("--resource", required=True, choices=object_resources)
-    object_get.add_argument("--id", required=True)
-    object_get.set_defaults(func=_object_get)
+    if "object-get" in enabled_commands:
+        object_get = subparsers.add_parser(
+            "object-get",
+            help="按 ID 读取单个对象详情。",
+            description="按资源类型和 ID 读取单个对象详情。",
+            formatter_class=CLIHelpFormatter,
+        )
+        object_get.add_argument("--resource", required=True, choices=object_resources)
+        object_get.add_argument("--id", required=True)
+        object_get.set_defaults(func=_object_get)
 
-    permission_list = subparsers.add_parser(
-        "permission-list",
-        help="列出权限、ACL 或 RBAC 记录。",
-        description="读取 asset-permission、ACL、RBAC 等权限相关资源。",
-        epilog="Examples:\n  " + "\n  ".join(PERMISSION_LIST_EXAMPLES),
-        formatter_class=CLIHelpFormatter,
-    )
-    permission_list.add_argument("--resource", choices=permission_resources, default="asset-permission")
-    permission_list.add_argument("--name", help="按权限名称精确优先匹配。")
-    permission_list.add_argument("--search", help="服务端搜索关键字。")
-    permission_list.add_argument("--user", help="按用户名或显示名筛选 asset-permission。")
-    permission_list.add_argument("--user-id", dest="user_id", help="按用户 UUID 筛选 asset-permission。")
-    permission_list.add_argument("--users", help="兼容字段，按用户标识筛选 asset-permission。")
-    permission_list.add_argument("--is-expired", dest="is_expired", help="按过期状态筛选，例如 true / false。")
-    add_filter_arguments(permission_list)
-    permission_list.set_defaults(func=_permission_list)
+    if "permission-list" in enabled_commands:
+        permission_list = subparsers.add_parser(
+            "permission-list",
+            help="列出权限、ACL 或 RBAC 记录。",
+            description="读取 asset-permission、ACL、RBAC 等权限相关资源。",
+            epilog="Examples:\n  " + "\n  ".join(_query_usage_examples("permission-list")),
+            formatter_class=CLIHelpFormatter,
+        )
+        permission_list.add_argument("--resource", choices=permission_resources, default="asset-permission")
+        permission_list.add_argument("--name", help="按权限名称精确优先匹配。")
+        permission_list.add_argument("--search", help="服务端搜索关键字。")
+        permission_list.add_argument("--user", help="按用户名或显示名筛选 asset-permission。")
+        permission_list.add_argument("--user-id", dest="user_id", help="按用户 UUID 筛选 asset-permission。")
+        permission_list.add_argument("--users", help="兼容字段，按用户标识筛选 asset-permission。")
+        permission_list.add_argument("--is-expired", dest="is_expired", help="按过期状态筛选，例如 true / false。")
+        add_filter_arguments(permission_list)
+        permission_list.set_defaults(func=_permission_list)
 
-    permission_get = subparsers.add_parser(
-        "permission-get",
-        help="按 ID 读取单条权限记录详情。",
-        description="按资源类型和 ID 读取权限、ACL 或 RBAC 详情。",
-        formatter_class=CLIHelpFormatter,
-    )
-    permission_get.add_argument("--resource", choices=permission_resources, default="asset-permission")
-    permission_get.add_argument("--id")
-    permission_get.add_argument("--permission-id")
-    permission_get.set_defaults(func=_permission_get)
+    if "permission-get" in enabled_commands:
+        permission_get = subparsers.add_parser(
+            "permission-get",
+            help="按 ID 读取单条权限记录详情。",
+            description="按资源类型和 ID 读取权限、ACL 或 RBAC 详情。",
+            formatter_class=CLIHelpFormatter,
+        )
+        permission_get.add_argument("--resource", choices=permission_resources, default="asset-permission")
+        permission_get.add_argument("--id")
+        permission_get.add_argument("--permission-id")
+        permission_get.set_defaults(func=_permission_get)
 
-    asset_perm_users = subparsers.add_parser(
-        "asset-perm-users",
-        help="查看某资产的授权主体列表。",
-        description="读取资产授权用户视图；当服务端视图为空时，会补充权限解释摘要。",
-        epilog="Examples:\n  " + "\n  ".join(ASSET_PERM_USERS_EXAMPLES),
-        formatter_class=CLIHelpFormatter,
-    )
-    asset_perm_users.add_argument("--asset-id", required=True)
-    add_filter_arguments(asset_perm_users)
-    asset_perm_users.set_defaults(func=_asset_perm_users)
+    if "asset-perm-users" in enabled_commands:
+        asset_perm_users = subparsers.add_parser(
+            "asset-perm-users",
+            help="查看某资产的授权主体列表。",
+            description="读取资产授权用户视图；当服务端视图为空时，会补充权限解释摘要。",
+            epilog="Examples:\n  " + "\n  ".join(_query_usage_examples("asset-perm-users")),
+            formatter_class=CLIHelpFormatter,
+        )
+        asset_perm_users.add_argument("--asset-id", required=True)
+        add_filter_arguments(asset_perm_users)
+        asset_perm_users.set_defaults(func=_asset_perm_users)
 
-    audit_list = subparsers.add_parser(
-        "audit-list",
-        help="读取登录、会话、命令等审计明细。",
-        description="读取指定审计类型的页面同款审计明细；未给时间时默认最近 7 天。",
-        epilog="Examples:\n  " + "\n  ".join(AUDIT_LIST_EXAMPLES),
-        formatter_class=CLIHelpFormatter,
-    )
-    audit_list.add_argument("--audit-type", required=True, choices=sorted(AUDIT_PATHS))
-    _add_page_query_time_arguments(audit_list)
-    audit_list.add_argument("--user", help="页面精确用户过滤；用于 operate、password_change、session、terminal-session。输入用户名或显示名时会解析成页面显示值。")
-    audit_list.add_argument("--username", help="登录日志页面用户名精确过滤；最终下发 `name(username)`，仅当 audit-type=login 时生效。")
-    audit_list.add_argument("--ip", help="登录日志页面来源 IP 精确过滤，仅当 audit-type=login 时生效。")
-    audit_list.add_argument("--type", help="登录日志页面设备类型精确过滤；仅当 audit-type=login 时生效，只支持 `W/T/U`。")
-    audit_list.add_argument("--city", help="登录日志页面城市精确过滤，仅当 audit-type=login 时生效。")
-    audit_list.add_argument("--mfa", help="登录日志页面 MFA 状态精确过滤；仅当 audit-type=login 时生效，只支持 `0/1/2`。")
-    audit_list.add_argument("--status", help="登录日志页面状态精确过滤；仅当 audit-type=login 时生效，只支持 `0/1`；不传时统计该时间窗内的全部登录记录。")
-    audit_list.add_argument("--change-by", dest="change_by", help="改密日志页面修改者精确过滤；最终下发 `name(username)`，仅当 audit-type=password_change 时生效。")
-    audit_list.add_argument("--remote-addr", dest="remote_addr", help="页面远端地址精确过滤；仅当 audit-type=password_change、session 或 terminal-session 时生效。")
-    audit_list.add_argument("--creator-name", dest="creator__name", help="作业日志页面创建者精确过滤；最终下发创建者显示名，仅当 audit-type=jobs 时生效。")
-    audit_list.add_argument("--material", help="作业日志页面执行内容精确过滤，仅当 audit-type=jobs 时生效。")
-    audit_list.add_argument("--asset", help="页面资产精确过滤；用于 session 和 terminal-session，输入名称或地址时会解析成 `name(ip)`。")
-    audit_list.add_argument("--asset-id", dest="asset_id", help="资产 UUID 精确过滤，仅当 audit-type=session、terminal-session 或 command 时生效。")
-    audit_list.add_argument("--account", help="页面账号精确过滤；用于 session 和 terminal-session，输入名称或用户名时会解析成 `name(username)`。")
-    audit_list.add_argument("--protocol", help="页面协议精确过滤；用于 session 和 terminal-session。")
-    audit_list.add_argument("--login-from", dest="login_from", help="页面登录来源精确过滤；用于 session 和 terminal-session，只支持 `WT/ST/RT/DT/VT`。")
-    audit_list.add_argument("--order", help="页面排序字段；仅当 audit-type=session、terminal-session 或 command 时生效。")
-    audit_list.add_argument("--action", help="操作日志页面动作精确过滤；仅当 audit-type=operate 时生效，支持 create/创建 等值。")
-    audit_list.add_argument("--resource-type", dest="resource_type", help="操作日志页面资源类型精确过滤，仅当 audit-type=operate 时生效。")
-    audit_list.add_argument("--command-storage-id", dest="command_storage_id", help="命令记录页面指定 command storage ID，仅当 audit-type=command 时生效。")
-    audit_list.add_argument(
-        "--command-storage-scope",
-        dest="command_storage_scope",
-        choices=["all"],
-        help="命令记录页面设为 `all` 时汇总全部可访问 command storage，仅当 audit-type=command 时生效。",
-    )
-    add_filter_arguments(audit_list)
-    audit_list.set_defaults(func=_audit_list)
+    if "audit-list" in enabled_commands:
+        audit_list = subparsers.add_parser(
+            "audit-list",
+            help="读取登录、会话、命令等审计明细。",
+            description="读取指定审计类型的页面同款审计明细；未给时间时默认最近 7 天。",
+            epilog="Examples:\n  " + "\n  ".join(_query_usage_examples("audit-list")),
+            formatter_class=CLIHelpFormatter,
+        )
+        audit_list.add_argument("--audit-type", required=True, choices=sorted(AUDIT_PATHS))
+        _add_page_query_time_arguments(audit_list)
+        audit_list.add_argument("--user", help="页面精确用户过滤；用于 operate、password_change、session、terminal-session。输入用户名或显示名时会解析成页面显示值。")
+        audit_list.add_argument("--username", help="登录日志页面用户名精确过滤；最终下发 `name(username)`，仅当 audit-type=login 时生效。")
+        audit_list.add_argument("--ip", help="登录日志页面来源 IP 精确过滤，仅当 audit-type=login 时生效。")
+        audit_list.add_argument("--type", help="登录日志页面设备类型精确过滤；仅当 audit-type=login 时生效，只支持 `W/T/U`。")
+        audit_list.add_argument("--city", help="登录日志页面城市精确过滤；仅当 audit-type=login 时生效。")
+        audit_list.add_argument("--mfa", help="登录日志页面 MFA 状态精确过滤；仅当 audit-type=login 时生效，只支持 `0/1/2`。")
+        audit_list.add_argument("--status", help="登录日志页面状态精确过滤；仅当 audit-type=login 时生效，只支持 `0/1`；不传时统计该时间窗内的全部登录记录。")
+        audit_list.add_argument("--change-by", dest="change_by", help="改密日志页面修改者精确过滤；最终下发 `name(username)`，仅当 audit-type=password_change 时生效。")
+        audit_list.add_argument("--remote-addr", dest="remote_addr", help="页面远端地址精确过滤；仅当 audit-type=password_change、session 或 terminal-session 时生效。")
+        audit_list.add_argument("--creator-name", dest="creator__name", help="作业日志页面创建者精确过滤；最终下发创建者显示名，仅当 audit-type=jobs 时生效。")
+        audit_list.add_argument("--material", help="作业日志页面执行内容精确过滤，仅当 audit-type=jobs 时生效。")
+        audit_list.add_argument("--asset", help="页面资产精确过滤；用于 session 和 terminal-session，输入名称或地址时会解析成 `name(ip)`。")
+        audit_list.add_argument("--asset-id", dest="asset_id", help="资产 UUID 精确过滤，仅当 audit-type=session、terminal-session 或 command 时生效。")
+        audit_list.add_argument("--account", help="页面账号精确过滤；用于 session 和 terminal-session，输入名称或用户名时会解析成 `name(username)`。")
+        audit_list.add_argument("--protocol", help="页面协议精确过滤；用于 session 和 terminal-session。")
+        audit_list.add_argument("--login-from", dest="login_from", help="页面登录来源精确过滤；用于 session 和 terminal-session，只支持 `WT/ST/RT/DT/VT`。")
+        audit_list.add_argument("--order", help="页面排序字段；仅当 audit-type=session、terminal-session 或 command 时生效。")
+        audit_list.add_argument("--action", help="操作日志页面动作精确过滤；仅当 audit-type=operate 时生效，支持 create/创建 等值。")
+        audit_list.add_argument("--resource-type", dest="resource_type", help="操作日志页面资源类型精确过滤，仅当 audit-type=operate 时生效。")
+        audit_list.add_argument("--command-storage-id", dest="command_storage_id", help="命令记录页面指定 command storage ID，仅当 audit-type=command 时生效。")
+        audit_list.add_argument(
+            "--command-storage-scope",
+            dest="command_storage_scope",
+            choices=["all"],
+            help="命令记录页面设为 `all` 时汇总全部可访问 command storage，仅当 audit-type=command 时生效。",
+        )
+        add_filter_arguments(audit_list)
+        audit_list.set_defaults(func=_audit_list)
 
-    audit_get = subparsers.add_parser(
-        "audit-get",
-        help="按 ID 读取单条审计详情。",
-        description=(
-            "按审计类型和记录 ID 读取单条详情。"
-            "当 audit-type=command 时，--id 必须使用 CLI 返回的稳定命令记录 ID。"
-        ),
-        formatter_class=CLIHelpFormatter,
-    )
-    audit_get.add_argument("--audit-type", required=True, choices=sorted(AUDIT_PATHS))
-    audit_get.add_argument("--id", required=True, help="记录 ID；command 审计必须传入 CLI 返回的稳定 ID。")
-    audit_get.set_defaults(func=_audit_get)
+    if "audit-get" in enabled_commands:
+        audit_get = subparsers.add_parser(
+            "audit-get",
+            help="按 ID 读取单条审计详情。",
+            description=(
+                "按审计类型和记录 ID 读取单条详情。"
+                "当 audit-type=command 时，--id 必须使用 CLI 返回的稳定命令记录 ID。"
+            ),
+            formatter_class=CLIHelpFormatter,
+        )
+        audit_get.add_argument("--audit-type", required=True, choices=sorted(AUDIT_PATHS))
+        audit_get.add_argument("--id", required=True, help="记录 ID；command 审计必须传入 CLI 返回的稳定 ID。")
+        audit_get.set_defaults(func=_audit_get)
 
-    terminal_sessions = subparsers.add_parser(
-        "terminal-sessions",
-        help="读取 terminal 在线或历史会话。",
-        description="查询 terminal 组件的在线或历史会话，支持页面同款时间窗、搜索和精确字段过滤。",
-        epilog="Examples:\n  " + "\n  ".join(TERMINAL_SESSION_EXAMPLES),
-        formatter_class=CLIHelpFormatter,
-    )
-    terminal_sessions.add_argument("--view", choices=["online", "history"])
-    _add_page_query_time_arguments(terminal_sessions)
-    terminal_sessions.add_argument("--user", help="页面用户精确过滤；输入用户名或显示名时会解析成 `name(username)`。")
-    terminal_sessions.add_argument("--account", help="页面账号精确过滤；输入名称或用户名时会解析成 `name(username)`。")
-    terminal_sessions.add_argument("--asset", help="页面资产精确过滤；输入名称或地址时会解析成 `name(ip)`。")
-    terminal_sessions.add_argument("--protocol", help="页面协议精确过滤。")
-    terminal_sessions.add_argument("--login-from", dest="login_from", help="页面登录来源精确过滤；只支持 `WT/ST/RT/DT/VT`。")
-    terminal_sessions.add_argument("--remote-addr", dest="remote_addr", help="页面远端地址精确过滤。")
-    terminal_sessions.add_argument("--asset-id", dest="asset_id", help="资产 UUID 精确过滤。")
-    terminal_sessions.add_argument("--order", help="页面排序字段。")
-    add_filter_arguments(terminal_sessions)
-    terminal_sessions.set_defaults(func=_terminal_sessions)
+    if "terminal-sessions" in enabled_commands:
+        terminal_sessions = subparsers.add_parser(
+            "terminal-sessions",
+            help="读取 terminal 在线或历史会话。",
+            description="查询 terminal 组件的在线或历史会话，支持页面同款时间窗、搜索和精确字段过滤。",
+            epilog="Examples:\n  " + "\n  ".join(_query_usage_examples("terminal-sessions")),
+            formatter_class=CLIHelpFormatter,
+        )
+        terminal_sessions.add_argument("--view", choices=["online", "history"])
+        _add_page_query_time_arguments(terminal_sessions)
+        terminal_sessions.add_argument("--user", help="页面用户精确过滤；输入用户名或显示名时会解析成 `name(username)`。")
+        terminal_sessions.add_argument("--account", help="页面账号精确过滤；输入名称或用户名时会解析成 `name(username)`。")
+        terminal_sessions.add_argument("--asset", help="页面资产精确过滤；输入名称或地址时会解析成 `name(ip)`。")
+        terminal_sessions.add_argument("--protocol", help="页面协议精确过滤。")
+        terminal_sessions.add_argument("--login-from", dest="login_from", help="页面登录来源精确过滤；只支持 `WT/ST/RT/DT/VT`。")
+        terminal_sessions.add_argument("--remote-addr", dest="remote_addr", help="页面远端地址精确过滤。")
+        terminal_sessions.add_argument("--asset-id", dest="asset_id", help="资产 UUID 精确过滤。")
+        terminal_sessions.add_argument("--order", help="页面排序字段。")
+        add_filter_arguments(terminal_sessions)
+        terminal_sessions.set_defaults(func=_terminal_sessions)
 
-    job_list = subparsers.add_parser(
-        "job-list",
-        help="读取作业列表。",
-        description="读取 `/api/v1/audits/jobs/` 作业列表，支持页面搜索和名称精确过滤。",
-        epilog="Examples:\n  " + "\n  ".join(JOB_LIST_EXAMPLES),
-        formatter_class=CLIHelpFormatter,
-    )
-    job_list.add_argument("--name", help="页面作业名称精确过滤。")
-    job_list.add_argument("--search", help="页面搜索框的直接搜索关键字。")
-    add_filter_arguments(job_list)
-    job_list.set_defaults(func=_job_list)
+    if "job-list" in enabled_commands:
+        job_list = subparsers.add_parser(
+            "job-list",
+            help="读取作业列表。",
+            description="读取 `/api/v1/audits/jobs/` 作业列表，支持页面搜索和名称精确过滤。",
+            epilog="Examples:\n  " + "\n  ".join(_query_usage_examples("job-list")),
+            formatter_class=CLIHelpFormatter,
+        )
+        job_list.add_argument("--name", help="页面作业名称精确过滤。")
+        job_list.add_argument("--search", help="页面搜索框的直接搜索关键字。")
+        add_filter_arguments(job_list)
+        job_list.set_defaults(func=_job_list)
 
-    command_storage_hint = subparsers.add_parser(
-        "command-storage-hint",
-        help="查看 command storage 选择上下文。",
-        description="用于命令审计前确认默认 storage、可切换 storage 和是否需要显式指定。",
-        epilog="Examples:\n  " + "\n  ".join(COMMAND_STORAGE_HINT_EXAMPLES),
-        formatter_class=CLIHelpFormatter,
-    )
-    command_storage_hint.add_argument("--command-storage-id", dest="command_storage_id")
-    command_storage_hint.add_argument("--command-storage-scope", dest="command_storage_scope", choices=["all"])
-    add_filter_arguments(command_storage_hint)
-    command_storage_hint.set_defaults(func=_command_storage_hint)
+    if "command-storage-hint" in enabled_commands:
+        command_storage_hint = subparsers.add_parser(
+            "command-storage-hint",
+            help="查看 command storage 选择上下文。",
+            description="用于命令审计前确认默认 storage、可切换 storage 和是否需要显式指定。",
+            epilog="Examples:\n  " + "\n  ".join(_query_usage_examples("command-storage-hint")),
+            formatter_class=CLIHelpFormatter,
+        )
+        command_storage_hint.add_argument("--command-storage-id", dest="command_storage_id")
+        command_storage_hint.add_argument("--command-storage-scope", dest="command_storage_scope", choices=["all"])
+        add_filter_arguments(command_storage_hint)
+        command_storage_hint.set_defaults(func=_command_storage_hint)
 
-    audit_analyze = subparsers.add_parser(
-        "audit-analyze",
-        help="执行 capability 化的审计分析。",
-        description="用于会话、命令、传输和异常行为等 capability 化分析。",
-        epilog="Examples:\n  " + "\n  ".join(AUDIT_ANALYZE_EXAMPLES),
-        formatter_class=CLIHelpFormatter,
-    )
-    audit_analyze.add_argument("--capability", required=True)
-    _add_common_audit_filter_arguments(
-        audit_analyze,
-        include_direction=True,
-        include_keyword=True,
-        include_storage=True,
-        include_top=True,
-    )
-    audit_analyze.add_argument("--asset-keywords", dest="asset_keywords", help="敏感资产审计使用的资产关键字。")
-    add_filter_arguments(audit_analyze)
-    audit_analyze.set_defaults(func=_audit_analyze)
+    if "audit-analyze" in enabled_commands:
+        audit_analyze = subparsers.add_parser(
+            "audit-analyze",
+            help="执行 capability 化的审计分析。",
+            description="用于会话、命令、传输和异常行为等 capability 化分析。",
+            epilog="Examples:\n  " + "\n  ".join(_query_usage_examples("audit-analyze")),
+            formatter_class=CLIHelpFormatter,
+        )
+        audit_analyze.add_argument("--capability", required=True)
+        _add_common_audit_filter_arguments(
+            audit_analyze,
+            include_direction=True,
+            include_keyword=True,
+            include_storage=True,
+            include_top=True,
+        )
+        audit_analyze.add_argument("--asset-keywords", dest="asset_keywords", help="敏感资产审计使用的资产关键字。")
+        add_filter_arguments(audit_analyze)
+        audit_analyze.set_defaults(func=_audit_analyze)
 
-    audit_capabilities = subparsers.add_parser(
-        "capabilities",
-        help="列出可用的 audit-analyze capability。",
-        description="输出所有由 jms_query.py audit-analyze 支持的 capability。",
-        formatter_class=CLIHelpFormatter,
-    )
-    audit_capabilities.set_defaults(func=_audit_capabilities)
+    if "capabilities" in enabled_commands:
+        audit_capabilities = subparsers.add_parser(
+            "capabilities",
+            help="列出可用的 audit-analyze capability。",
+            description="输出所有由 jms_query.py audit-analyze 支持的 capability。",
+            formatter_class=CLIHelpFormatter,
+        )
+        audit_capabilities.set_defaults(func=_audit_capabilities)
     return parser
 
 
-def main() -> int:
+def main(profile: str = "all", argv: list[str] | None = None) -> int:
     def _run_cli():
-        parser = build_parser()
+        active_argv = list(sys.argv[1:] if argv is None else argv)
+        enabled_commands = _query_profile_commands(profile)
+        parser = build_parser(profile)
         reject_deprecated_pagination_cli_args(
-            sys.argv[1:],
+            active_argv,
             script_name="jms_query.py",
             deprecated_commands={
                 "object-list",
@@ -1159,18 +1240,18 @@ def main() -> int:
                 "terminal-sessions",
                 "job-list",
                 "audit-analyze",
-            },
+            } & enabled_commands,
             usage_examples_by_command={
-                "object-list": OBJECT_LIST_EXAMPLES,
-                "permission-list": PERMISSION_LIST_EXAMPLES,
-                "asset-perm-users": ASSET_PERM_USERS_EXAMPLES,
-                "audit-list": AUDIT_LIST_EXAMPLES,
-                "terminal-sessions": TERMINAL_SESSION_EXAMPLES,
-                "job-list": JOB_LIST_EXAMPLES,
-                "audit-analyze": AUDIT_ANALYZE_EXAMPLES,
+                "object-list": _query_usage_examples("object-list"),
+                "permission-list": _query_usage_examples("permission-list"),
+                "asset-perm-users": _query_usage_examples("asset-perm-users"),
+                "audit-list": _query_usage_examples("audit-list"),
+                "terminal-sessions": _query_usage_examples("terminal-sessions"),
+                "job-list": _query_usage_examples("job-list"),
+                "audit-analyze": _query_usage_examples("audit-analyze"),
             },
         )
-        args = parser.parse_args(sys.argv[1:])
+        args = parser.parse_args(active_argv)
         return args.func(args)
 
     return run_and_print(_run_cli)

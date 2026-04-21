@@ -4,7 +4,7 @@ import copy
 import re
 import time
 
-from .jms_types import EndpointSpec, JumpServerAPIError, PlatformSpec
+from jms_types import EndpointSpec, JumpServerAPIError, PlatformSpec
 
 
 CORE_ENDPOINTS = {

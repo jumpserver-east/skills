@@ -5,22 +5,22 @@ if __package__ in {None, ""}:
     import sys
     from pathlib import Path
 
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from jumpserver_api.jms_bootstrap import ensure_requirements_installed
+from jms_bootstrap import ensure_requirements_installed
 
 ensure_requirements_installed()
 
 import argparse
 
-from jumpserver_api.jms_reporting import build_daily_usage_report, validate_report_contract
-from jumpserver_api.jms_runtime import CLIHelpFormatter, print_json, run_and_print
+from jms_reporting import build_daily_usage_report, validate_report_contract
+from jms_runtime import CLIHelpFormatter, print_json, run_and_print
 
 
 DAILY_USAGE_EXAMPLES = [
-    "python3 scripts/jumpserver_api/jms_report.py daily-usage --date 20260310",
-    "python3 scripts/jumpserver_api/jms_report.py daily-usage --period 上周 --org-name Default",
-    "python3 scripts/jumpserver_api/jms_report.py daily-usage --date-from '2026-03-10 00:00:00' --date-to '2026-03-24 23:59:59' --org-id 00000000-0000-0000-0000-000000000000",
+    "python3 jumpserver-usage-reporting/scripts/jms_report.py daily-usage --date 20260310",
+    "python3 jumpserver-usage-reporting/scripts/jms_report.py daily-usage --period 上周 --org-name Default",
+    "python3 jumpserver-usage-reporting/scripts/jms_report.py daily-usage --date-from '2026-03-10 00:00:00' --date-to '2026-03-24 23:59:59' --org-id 00000000-0000-0000-0000-000000000000",
 ]
 
 
